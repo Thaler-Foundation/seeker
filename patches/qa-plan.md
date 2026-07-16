@@ -11,7 +11,7 @@ Source of truth: operator-dashboard.tsx consumes the 5 quant hooks
 (graph-verified 2026-07-16) and wraps operator-metrics.tsx (4 sections
 Business / Risk / Performance / Exposure, admin double-gated). Table columns
 come from the QuantVaultRow schema verified 19/19 against
-packages/contracts/src/quant.ts:8: signerAddress, netCarryApyBps, leverage,
+Thaler-Finance packages/contracts/src/quant.ts:8: signerAddress, netCarryApyBps, leverage,
 ltvPct, venueMarginRatioPct, verifyStatus (subset displayed on mobile).
 Deliverable: one 412x915 frame in section "07 Analytics & Operator" with an
 ADMIN ONLY eyebrow, verify/engine strip, 4 metric cells, and the per-vault

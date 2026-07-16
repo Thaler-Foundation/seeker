@@ -1,20 +1,20 @@
 # Thaler Seeker - app architecture
 
-The Seeker app is an Expo (React Native) app inside the bun workspace monorepo,
-mirroring the production web UI (Thaler-Finance apps/web protected routes at
-main 4e841e0b plus the Thaler-Foundation/frontend /portfolio upgrades).
+The Seeker app is a standalone Expo (React Native) repo mirroring the
+production web UI (Thaler-Finance apps/web protected routes at main 4e841e0b
+plus the Thaler-Foundation/frontend /portfolio upgrades).
 
 ## Stack
 
 - Expo SDK ~57 / React Native 0.86, expo-router file routing, TypeScript strict
 - @tanstack/react-query 5 for all server state
 - @privy-io/expo for auth (email OTP), react-native-svg for charts and icons
-- Workspace deps: @thaler/contracts (response types)
+- Response types local to src/lib/contracts.ts
 
 ## Directory map
 
 ```
-apps/seeker/
+./
   app.json               Expo config: name "Thaler Seeker", finance.thaler.seeker,
                          icon/adaptive icon from the real apps/web logo.png
   metro.config.js        browser-first unstable_conditionNames so jose (inside
@@ -22,7 +22,7 @@ apps/seeker/
   tsconfig.json          strict, @/* -> src/*
   assets/images/         icon set (real logo), hero-waves.png (live-site capture),
                          solana-logo.png, thaler-logo.png
-  patches/               this documentation + the frontend wiring patch
+  patches/               this documentation
   src/
     theme/tokens.ts      dark/light/tier/brand/spacing/radius tokens from
                          apps/web globals.css + tier-meta.ts
@@ -83,7 +83,7 @@ No display numbers are hardcoded; all rendered values come from the API.
 
 ## Gates
 
-- `bunx tsc --noEmit` inside apps/seeker: 0 errors
+- `bunx tsc --noEmit`: 0 errors
 - `bunx expo export --platform android`: Hermes bundle (~6MB) + asset map
 - Comment policy: one short header line per file, no other comments
 - Device login needs the user-provided Privy env keys; mutating flows

@@ -3,7 +3,7 @@
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import type { AnalyticsKpis, StrategyBreakdownRow } from '@thaler/contracts';
+import type { AnalyticsKpis, StrategyBreakdownRow } from '@/lib/contracts';
 import { fetchThaler, endpoints } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
