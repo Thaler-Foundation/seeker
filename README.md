@@ -4,7 +4,7 @@ Mobile app for the Solana Seeker device (Android, Solana Mobile dApp store).
 Expo SDK 57 / React Native 0.86 / expo-router. The app calls the deployed
 Next BFF (EXPO_PUBLIC_BFF_URL, default https://thaler.finance) with the
 user's Privy token; the x-api-key never ships in the binary.
-@thaler/contracts is vendored under packages/contracts.
+Response types live in src/lib/contracts.ts.
 
 Run: `bun install`, then `bunx expo start`.
 Gates: `bunx tsc --noEmit`, `bunx expo export -p android`.

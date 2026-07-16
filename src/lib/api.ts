@@ -4,7 +4,7 @@ import type {
   ListVaultsResponse,
   VaultPositions,
   UserVaultStatsView,
-} from '@thaler/contracts';
+} from '@/lib/contracts';
 
 const DEFAULT_BFF = 'https://thaler.finance';
 
