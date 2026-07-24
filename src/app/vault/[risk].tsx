@@ -394,7 +394,7 @@ export default function VaultDetail() {
                   <Text style={s.cardTitle}>Strategy Overview</Text>
                   <View style={s.bigStatGrid}>
                     <BigStat label="Liquidity Managed" value={tierLiquiditySol > 0 ? tierLiquiditySol.toFixed(2) : '-'} sub="SOL" />
-                    <BigStat label="30D APY" value={`${annualApy.toFixed(1)}%`} tone={brand.success} />
+                    <BigStat label="Projected APR" value={`${annualApy.toFixed(1)}%`} tone={brand.success} />
                     <BigStat label="Total Yield" value={tierTotalYieldSol.toFixed(3)} sub="SOL" tone={brand.success} />
                   </View>
                   <View style={s.factBlock}>
@@ -427,7 +427,7 @@ export default function VaultDetail() {
                   </View>
                 </View>
                 <View style={s.bigStatGrid}>
-                  <BigStat label="Avg. Net APY" value={`${(medianApy * 100).toFixed(2)}%`} tone={brand.success} />
+                  <BigStat label="Avg. Projected APR" value={`${(medianApy * 100).toFixed(2)}%`} tone={brand.success} />
                   <BigStat label="Projected Return" value={`+${posRoiAt(backDays).toFixed(2)}%`} tone={brand.success} />
                   <BigStat label="Duration" value={`${backDays} Days`} />
                 </View>
@@ -492,7 +492,7 @@ export default function VaultDetail() {
             <View style={s.card}>
               <Text style={s.cardTitle}>Vaults Info</Text>
               <View style={s.factBlock}>
-                <FactRow label="30D APY" value={`${annualApy.toFixed(1)}%`} />
+                <FactRow label="Projected APR" value={`${annualApy.toFixed(1)}%`} />
                 <FactRow label="Utilization" value={`${utilizationPct.toFixed(1)}%`} />
                 <FactRow label="Total Deposits" value={`${tierLiquiditySol.toFixed(2)} SOL`} />
               </View>
@@ -526,22 +526,18 @@ function rowMetrics(v: VaultRow, pos: VaultPositions | undefined, solPriceUsd: n
     p?.realizedYieldLamports != null
       ? Number(p.realizedYieldLamports) / LAMPORTS
       : Number(v.metrics?.claimableSol ?? 0);
-  const daysHeld = p?.daysHeld ?? Math.max(0, (Date.now() - new Date(v.createdAt).getTime()) / 86_400_000);
   const dep = Number(v.equityLamports) / LAMPORTS;
-  const base = dep > 0 ? 1 + yieldSol / dep : 0;
-  const netApy =
-    p?.realizedYieldLamports != null && base > 0
-      ? Math.max(0, (Math.pow(base, 365.25 / Math.max(daysHeld, 30)) - 1) * 100)
-      : Number(v.metrics?.apyBps ?? 0) / 100;
+  // roi = realized yield over deposit, percent (same basis as the web).
+  const roi = dep > 0 ? (yieldSol / dep) * 100 : 0;
   const ltv = Number(v.ltvBps ?? 0) / 100;
   const f = (n: number) => (Number.isFinite(n) ? n : 0);
-  return { netValue: f(netValue), netApy: f(netApy), yield: f(yieldSol), ltv: f(ltv) };
+  return { netValue: f(netValue), roi: f(roi), yield: f(yieldSol), ltv: f(ltv) };
 }
 
-type SortKey = 'netValue' | 'netApy' | 'yield' | 'ltv';
+type SortKey = 'netValue' | 'roi' | 'yield' | 'ltv';
 const VAULT_COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'netValue', label: 'NET VALUE' },
-  { key: 'netApy', label: 'NET APY' },
+  { key: 'roi', label: 'ROI' },
   { key: 'yield', label: 'YIELD' },
   { key: 'ltv', label: 'LTV' },
 ];
@@ -609,10 +605,10 @@ function VaultsTable({ vaults, solPrice, onSelect }: { vaults: VaultRow[]; solPr
                   style={[
                     s.cellFixed,
                     { width: colW },
-                    { color: m.netApy > 0 ? brand.success : m.netApy < 0 ? brand.warning : dark.foreground },
+                    { color: m.roi > 0 ? brand.success : m.roi < 0 ? brand.warning : dark.foreground },
                   ]}
                 >
-                  {m.netApy.toFixed(2)}%
+                  {m.roi.toFixed(2)}%
                 </Text>
                 <Text style={[s.cellFixed, { width: colW }, m.yield > 0 && { color: brand.success }]}>
                   {m.yield.toFixed(4)} SOL
@@ -751,10 +747,10 @@ function PositionDetail({
         ? Number(statRow.realizedYieldLamports) / LAMPORTS
         : 0;
   const pendingUsdc = Number.isFinite(Number(p?.pendingRecycleUsd)) ? Number(p?.pendingRecycleUsd) : 0;
-  const apyBpsRaw = p?.apyBps ?? vault.metrics?.apyBps ?? 0;
-  const netApy = Number.isFinite(apyBpsRaw) ? apyBpsRaw / 100 : 0;
   const eq = Number(vault.equityLamports);
   const managedSol = Number.isFinite(eq) ? Math.round(eq / LAMPORTS / 2) * 2 : 0;
+  const depositSol = Number.isFinite(eq) ? eq / LAMPORTS : 0;
+  const roi = depositSol > 0 ? (earnedSol / depositSol) * 100 : 0;
   const daysHeld = Number.isFinite(p?.daysHeld ?? NaN) ? (p?.daysHeld as number) : 0;
   const claimableNet = statRow?.claimableNetSol ?? 0;
   const cp = p?.claimPreview ?? null;
@@ -798,7 +794,7 @@ function PositionDetail({
             sub={solPrice > 0 ? `≈ $${(earnedSol * solPrice).toFixed(2)}` : undefined}
             tone={earnedSol >= 0 ? brand.success : brand.warning}
           />
-          <BigStat label="Net APY" value={`${netApy.toFixed(2)}%`} tone={netApy >= 0 ? brand.success : brand.warning} />
+          <BigStat label="ROI" value={`${roi.toFixed(2)}%`} tone={roi >= 0 ? brand.success : brand.warning} />
           <BigStat label="USDC Earned" value={`${pendingUsdc.toFixed(2)} USDC`} tone={pendingUsdc >= 0 ? brand.success : brand.warning} />
         </View>
         <View style={s.factBlock}>
@@ -924,9 +920,12 @@ function LiquidationCard({ vault, pos, solPrice }: { vault: VaultRow | null; pos
     );
   }
   const p = pos as unknown as
-    | { equityNavLamports?: string; pendingRecycleUsd?: number | null; apyBps?: number; activeUpsideBorrowCount?: number; positions?: { kaminoMultiply?: { netCarryApyBps?: number } | null } }
+    | { equityNavLamports?: string; realizedYieldLamports?: string | null; pendingRecycleUsd?: number | null; apyBps?: number; activeUpsideBorrowCount?: number; positions?: { kaminoMultiply?: { netCarryApyBps?: number } | null } }
     | undefined;
-  const netApy = (p?.apyBps ?? vault.metrics?.apyBps ?? 0) / 100;
+  const depositSol = Number(vault.equityLamports) / LAMPORTS;
+  const realizedSol =
+    p?.realizedYieldLamports != null ? Number(p.realizedYieldLamports) / LAMPORTS : 0;
+  const roi = depositSol > 0 ? (realizedSol / depositSol) * 100 : 0;
   const pendingUsd = p?.pendingRecycleUsd ?? 0;
   const netValueSol =
     (p?.equityNavLamports ? Number(p.equityNavLamports) / LAMPORTS : Number(vault.equityLamports) / LAMPORTS) +
@@ -940,7 +939,7 @@ function LiquidationCard({ vault, pos, solPrice }: { vault: VaultRow | null; pos
     <View style={s.card}>
       <Text style={s.cardTitle}>Your Risk Summary</Text>
       <View style={s.factBlock}>
-        <FactRow label="Your Net APY" value={`${netApy.toFixed(2)}%`} valueColor={netApy >= 0 ? brand.success : brand.warning} />
+        <FactRow label="ROI" value={`${roi.toFixed(2)}%`} valueColor={roi >= 0 ? brand.success : brand.warning} />
         <FactRow label="Net Value" value={`${Number.isFinite(netValueSol) ? netValueSol.toFixed(4) : '0.0000'} SOL`} />
         <FactRow label="Vault Health" value={vaultHealth ?? '-'} valueColor={tone(vaultHealth)} />
         <FactRow label="Short Hedge" value={shortHedge ?? '-'} valueColor={tone(shortHedge)} />

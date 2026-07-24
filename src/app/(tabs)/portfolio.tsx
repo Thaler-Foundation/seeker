@@ -88,6 +88,16 @@ export default function Portfolio() {
     staleTime: 60_000,
   });
 
+  // vaults list carries the deposit (equityLamports) + ltv the stats view lacks;
+  // joined by id for per-vault roi and ltv, matching the web portfolio.
+  const vaultList = useQuery({
+    queryKey: ['vaults'],
+    queryFn: async () => fetchThaler<ListVaultsResponse>(await getToken(), endpoints.vaults),
+    enabled: authenticated,
+    staleTime: 60_000,
+  });
+  const vaultById = new Map((vaultList.data?.vaults ?? []).map((v) => [v.id, v]));
+
   const history = useQuery({
     queryKey: ['transaction-history'],
     queryFn: async () => {
@@ -188,11 +198,12 @@ export default function Portfolio() {
   const netValueSol = rows.reduce((s, r) => s + Number(r.equityNavLamports) / 1e9, 0);
   const yieldEarnedSol = rows.reduce((s, r) => s + Number(r.realizedYieldLamports) / 1e9, 0);
   const claimableNet = stats.data?.claimableNetTotalSol ?? 0;
-  const apys = rows
-    .map((r) => r.netCarryApyBps)
-    .filter((v): v is number => v !== null)
-    .sort((a, b) => a - b);
-  const medianApy = apys.length ? apys[Math.floor(apys.length / 2)]! / 100 : 0;
+  // deposited principal across all vaults = the roi denominator (matches web).
+  const depositedSol = rows.reduce((s, r) => {
+    const v = vaultById.get(r.vaultExecutionId);
+    return s + (v ? Number(v.equityLamports) / 1e9 : 0);
+  }, 0);
+  const portfolioRoi = depositedSol > 0 ? (yieldEarnedSol / depositedSol) * 100 : 0;
   const money = (v: number) =>
     currency === 'USD' && solPrice > 0 ? `$${(v * solPrice).toFixed(2)}` : `${v.toFixed(4)} SOL`;
 
@@ -211,7 +222,7 @@ export default function Portfolio() {
     },
     { label: 'Claimable Yield', value: money(claimableNet), tone: brand.success },
     { label: 'Active Vaults', value: String(rows.length) },
-    { label: 'Median APY', value: `${medianApy.toFixed(2)}%`, tone: brand.success },
+    { label: 'ROI', value: `${portfolioRoi.toFixed(2)}%`, tone: brand.success },
   ];
 
   return (
@@ -325,43 +336,46 @@ export default function Portfolio() {
 
         {tab === 'vaults' ? (
           <View style={styles.list}>
-            {rows.map((r, i) => (
-              <Pressable
-                key={r.vaultExecutionId}
-                onPress={() =>
-                  router.push(`/vault/${r.tier}?tab=position&vault=${r.vaultExecutionId}`)
-                }
-                style={[styles.row, i > 0 && styles.rowBorder]}
-              >
-                <View style={styles.rowL}>
-                  <View style={[styles.dot, { backgroundColor: tier.safe }]} />
-                  <Text style={styles.rowLabel}>{r.tier} Vault</Text>
-                </View>
-                <View style={styles.rowNums}>
-                  <Text style={styles.rowValue}>
-                    {(Number(r.equityNavLamports) / 1e9).toFixed(4)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.rowValue,
-                      {
-                        color:
-                          Number(r.realizedYieldLamports) >= 0 ? brand.success : brand.error,
-                      },
-                    ]}
-                  >
-                    {`${Number(r.realizedYieldLamports) >= 0 ? '+' : ''}${(
-                      Number(r.realizedYieldLamports) / 1e9
-                    ).toFixed(4)}`}
-                  </Text>
-                  <Text style={[styles.rowValue, { color: brand.success }]}>
-                    {r.netCarryApyBps !== null
-                      ? `${(r.netCarryApyBps / 100).toFixed(2)}%`
-                      : '-'}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
+            {rows.map((r, i) => {
+              const v = vaultById.get(r.vaultExecutionId);
+              const depositLamports = v ? Number(v.equityLamports) : 0;
+              const realized = Number(r.realizedYieldLamports);
+              const roi = depositLamports > 0 ? (realized / depositLamports) * 100 : 0;
+              const ltvPct = v ? Number(v.ltvBps ?? 0) / 100 : 0;
+              return (
+                <Pressable
+                  key={r.vaultExecutionId}
+                  onPress={() =>
+                    router.push(`/vault/${r.tier}?tab=position&vault=${r.vaultExecutionId}`)
+                  }
+                  style={[styles.row, i > 0 && styles.rowBorder]}
+                >
+                  <View style={styles.rowL}>
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: (tier as Record<string, string>)[r.tier] ?? tier.safe },
+                      ]}
+                    />
+                    <Text style={styles.rowLabel}>{`${TIER_LABEL[r.tier] ?? 'Safe'} Vault`}</Text>
+                  </View>
+                  <View style={styles.rowNums}>
+                    <Text style={styles.rowValue}>
+                      {(Number(r.equityNavLamports) / 1e9).toFixed(4)}
+                    </Text>
+                    <Text style={[styles.rowValue, { color: roi >= 0 ? brand.success : brand.error }]}>
+                      {`${roi.toFixed(2)}%`}
+                    </Text>
+                    <Text
+                      style={[styles.rowValue, { color: realized >= 0 ? brand.success : brand.error }]}
+                    >
+                      {`${realized >= 0 ? '+' : ''}${(realized / 1e9).toFixed(4)}`}
+                    </Text>
+                    <Text style={styles.rowValue}>{`${ltvPct.toFixed(2)}%`}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
             {authenticated && !stats.isLoading && rows.length === 0 ? (
               <View style={styles.empty}>
                 <Text style={styles.hint}>No vaults yet</Text>

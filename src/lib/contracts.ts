@@ -7,20 +7,41 @@ export type AnalyticsKpis = {
   activeVaultCount: number;
   yield30dUsd: number;
   projectedApyBps: number;
+  weightedAvgApyBps: number;
+  // protocol roi since open, realized yield over deposit, percent
+  roiPct?: number;
   apy30dMedianBps?: number;
+  tvl30dGrowthPct: number;
+  tvl30dGrowthUsd?: number;
+  vaults30dDelta: number;
+  // all time total yield generated, usd
+  totalYieldGeneratedUsd?: number;
+  // all time total yield claimed to users, usd
+  totalYieldClaimedUsd?: number;
 };
 
 export type StrategyBreakdownRow = {
   mode: AnalyticsMode;
   vaultCount: number;
   tvlUsd: number;
+  // total sol deposited in the mode, price independent twin of tvlUsd
   tvlSol?: number;
   projectedApyBps: number;
+  // mode roi since open, active realized yield over active deposit, percent
+  roiPct?: number;
+  meanVaultApyBps?: number | null;
   apy30dMedianBps?: number | null;
+  // trailing 30d all components yield over mode equity, annualized, bps
+  rolling30dApyBps?: number;
   pendingUsdcUsd?: number | null;
   yield30dUsd: number;
+  // lifetime all components yield, the total yield made, usd
+  lifetimeYieldUsd?: number;
+  // same lifetime yield in sol, price independent, read this for the total yield box
   lifetimeYieldSol?: number;
   utilization: number;
+  // average kamino multiply forward net carry apy across the mode open vaults, bps
+  avgMultiplyNetCarryBps?: number | null;
 };
 
 export type Tier =

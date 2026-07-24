@@ -1,12 +1,14 @@
 // Create: staged deposit flow, fixed 2 SOL, 0.06 SOL reserve.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Image, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
+import { TermsModal } from '@/components/terms-modal';
 
 const FIXED_SOL = 2;
 const EQUITY_LAMPORTS = String(FIXED_SOL * 1_000_000_000);
@@ -38,10 +40,12 @@ type StateResponse = {
 type Stage = 'configure' | 'fund' | 'open';
 
 export default function Create() {
+  const router = useRouter();
   const { getToken, authenticated } = useAuth();
   const [stage, setStage] = useState<Stage>('configure');
   const [pairId, setPairId] = useState<string | null>(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
+  const [termsOpen, setTermsOpen] = useState(false);
 
   const pub = useQuery({
     queryKey: ['public-stats'],
@@ -111,6 +115,19 @@ export default function Create() {
   const totalSteps = openState.data?.steps.length || 8;
   const pendingSteps = Object.keys(STEP_LABELS).map((kind) => ({ kind, state: 'PENDING' }));
 
+  // vault built: show the live line briefly, then go to the portfolio tab like web.
+  const executionState = openState.data?.execution.state;
+  useEffect(() => {
+    if (executionState !== 'DONE') return;
+    const t = setTimeout(() => {
+      router.push('/portfolio');
+      setStage('configure');
+      setPairId(null);
+      setExecutionId(null);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [executionState, router]);
+
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -127,7 +144,7 @@ export default function Create() {
             </View>
             <View style={styles.depositBox}>
               <View style={styles.rowBetween}>
-                <Text style={styles.mutedSm}>You deposit</Text>
+                <Text style={styles.mutedSm}>Vault size</Text>
                 <Text style={styles.mutedSm}>{usd > 0 ? `~$${usd.toFixed(2)}` : '-'}</Text>
               </View>
               <View style={styles.rowBetween}>
@@ -144,12 +161,12 @@ export default function Create() {
             </View>
             <Text style={styles.eyebrow}>WHERE YOUR SOL GOES</Text>
             <Text style={styles.prose}>
-              Your deposit is staked into jitoSOL, supplied to Kamino Lend, paired with a Kamino
+              Your SOL is staked into jitoSOL, supplied to Kamino Lend, paired with a Kamino
               liquidity tail, and hedged with a short position on Pacifica, all kept delta-neutral
               so returns do not depend on the SOL price.
             </Text>
             <View style={styles.miniRows}>
-              <MiniRow label="Target APY (net)" value="8.2% to 13.8%" tone={brand.success} />
+              <MiniRow label="Projected APR (net)" value="8.2% to 13.8%" tone={brand.success} />
               <MiniRow
                 label="Projected Earnings (annual)"
                 value={preview.isLoading && authenticated ? '...' : '+0.16 to 0.28 SOL'}
@@ -161,7 +178,7 @@ export default function Create() {
             <Pressable
               accessibilityRole="button"
               disabled={!authenticated || createWallets.isPending}
-              onPress={() => createWallets.mutate()}
+              onPress={() => setTermsOpen(true)}
               style={({ pressed }) => [
                 styles.cta,
                 (!authenticated || createWallets.isPending) && { opacity: 0.5 },
@@ -169,7 +186,7 @@ export default function Create() {
               ]}
             >
               <Text style={styles.ctaLabel}>
-                {createWallets.isPending ? 'Preparing...' : `Deposit ${FIXED_SOL} SOL`}
+                {createWallets.isPending ? 'Preparing...' : `Open Vault · ${FIXED_SOL} SOL`}
               </Text>
             </Pressable>
           </View>
@@ -211,6 +228,14 @@ export default function Create() {
               <Text style={styles.ctaLabel}>
                 {openVault.isPending ? 'Opening...' : 'Open vault'}
               </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={openVault.isPending}
+              onPress={() => setStage('configure')}
+              style={styles.backBtn}
+            >
+              <Text style={styles.backLabel}>Back</Text>
             </Pressable>
           </View>
         ) : null}
@@ -256,6 +281,14 @@ export default function Create() {
           </View>
         ) : null}
       </ScrollView>
+      <TermsModal
+        open={termsOpen}
+        onClose={() => setTermsOpen(false)}
+        onAccept={() => {
+          setTermsOpen(false);
+          createWallets.mutate();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -320,6 +353,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaLabel: { color: dark.background, fontSize: 16, fontWeight: '600' },
+  backBtn: { alignItems: 'center', paddingVertical: 4 },
+  backLabel: { color: dark.mutedForeground, fontSize: 13 },
   track: { height: 8, borderRadius: 4, backgroundColor: dark.muted, overflow: 'hidden' },
   fill: { height: 8, backgroundColor: brand.success },
   steps: { gap: 2 },
