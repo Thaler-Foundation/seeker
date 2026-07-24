@@ -73,7 +73,7 @@ export default function Home() {
             Kamino lend carry plus a Pacifica delta-neutral hedge. Yield in any market direction.
           </Text>
           <View style={styles.featStats}>
-            <TopStat label="30D APY" value={`${apy30.toFixed(2)}%`} tone={brand.success} />
+            <TopStat label="Projected APR" value={`${apy30.toFixed(2)}%`} tone={brand.success} />
             <TopStat
               label="Deposited"
               value={tvlSol > 0 ? `${Math.round(tvlSol).toLocaleString()} SOL` : formatTvl(tvl)}

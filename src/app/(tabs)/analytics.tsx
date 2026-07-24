@@ -40,8 +40,11 @@ export default function Analytics() {
   const k = q.data?.kpis;
   const KPIS = [
     { label: 'Total Value Locked', value: k ? compactUsd(k.totalTvlUsd) : '-' },
-    { label: 'Protocol APY (net)', value: k ? `${(k.projectedApyBps / 100).toFixed(1)}%` : '-' },
-    { label: 'Yield Generated', value: k ? compactUsd(k.yield30dUsd) : '-' },
+    { label: 'Protocol ROI', value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-' },
+    {
+      label: 'Yield Generated',
+      value: k && k.totalYieldGeneratedUsd != null ? compactUsd(k.totalYieldGeneratedUsd) : '-',
+    },
     { label: 'Active Vaults', value: k ? String(k.activeVaultCount) : '-' },
   ];
 
