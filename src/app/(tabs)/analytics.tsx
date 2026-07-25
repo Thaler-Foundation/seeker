@@ -1,12 +1,13 @@
 // Analytics: protocol KPIs and strategy breakdown from /v1/analytics.
 
+import { type ReactNode } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import type { AnalyticsKpis, StrategyBreakdownRow } from '@/lib/contracts';
-import { fetchThaler, endpoints } from '@/lib/api';
+import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
+import { dark, tier, radius, spacing } from '@/theme/tokens';
 
 type AnalyticsResponse = {
   kpis: AnalyticsKpis;
@@ -28,6 +29,22 @@ function compactUsd(v: number): string {
   return `$${Math.round(v)}`;
 }
 
+function compactSol(v: number): string {
+  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(2)}k`;
+  return v.toFixed(2);
+}
+
+// sol amount primary, live usd smaller in parentheses, same as the web hero.
+function SolUsd({ sol, price }: { sol: number; price: number }) {
+  return (
+    <Text style={styles.kpiValue}>
+      {compactSol(sol)} SOL
+      <Text style={styles.kpiUsd}> ({compactUsd(sol * price)})</Text>
+    </Text>
+  );
+}
+
 export default function Analytics() {
   const { getToken, authenticated } = useAuth();
   const q = useQuery({
@@ -37,13 +54,33 @@ export default function Analytics() {
     enabled: authenticated,
     staleTime: 60_000,
   });
+  const pub = useQuery({
+    queryKey: ['public-stats'],
+    queryFn: () => fetchThaler<PublicStats>(null, endpoints.publicStats),
+    staleTime: 60_000,
+  });
   const k = q.data?.kpis;
-  const KPIS = [
-    { label: 'Total Value Locked', value: k ? compactUsd(k.totalTvlUsd) : '-' },
+  const breakdown = q.data?.strategyBreakdown ?? [];
+  const num = (v: number | null | undefined) =>
+    typeof v === 'number' && Number.isFinite(v) ? v : 0;
+  // sol-primary tvl + total yield summed from the per-mode rows, same as web.
+  const totalTvlSol = breakdown.reduce((s, r) => s + num(r.tvlSol), 0);
+  const totalYieldSol = breakdown.reduce((s, r) => s + num(r.lifetimeYieldSol), 0);
+  const sumTvlUsd = breakdown.reduce((s, r) => s + num(r.tvlUsd), 0);
+  // live price, else the price implied by the server rows.
+  const livePrice = pub.data?.ok ? pub.data.solPriceUsd : 0;
+  const solPrice = livePrice > 0 ? livePrice : totalTvlSol > 0 ? sumTvlUsd / totalTvlSol : 0;
+  const KPIS: { label: string; value?: string; node?: ReactNode }[] = [
+    {
+      label: 'Total Value Locked',
+      node: k ? <SolUsd sol={totalTvlSol} price={solPrice} /> : undefined,
+      value: k ? undefined : '-',
+    },
     { label: 'Protocol ROI', value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-' },
     {
       label: 'Yield Generated',
-      value: k && k.totalYieldGeneratedUsd != null ? compactUsd(k.totalYieldGeneratedUsd) : '-',
+      node: k ? <SolUsd sol={totalYieldSol} price={solPrice} /> : undefined,
+      value: k ? undefined : '-',
     },
     { label: 'Active Vaults', value: k ? String(k.activeVaultCount) : '-' },
   ];
@@ -60,7 +97,7 @@ export default function Analytics() {
         <View style={styles.grid}>
           {KPIS.map((c) => (
             <View key={c.label} style={styles.kpi}>
-              <Text style={styles.kpiValue}>{c.value}</Text>
+              {c.node ?? <Text style={styles.kpiValue}>{c.value}</Text>}
               <Text style={styles.kpiLabel}>{c.label}</Text>
             </View>
           ))}
@@ -69,7 +106,7 @@ export default function Analytics() {
           <Text style={[styles.eyebrow, { padding: spacing.base, paddingBottom: 8 }]}>
             STRATEGY BREAKDOWN
           </Text>
-          {(q.data?.strategyBreakdown ?? []).map((r, i) => {
+          {breakdown.map((r, i) => {
             const meta = MODE_META[r.mode] ?? MODE_META.A;
             const live = r.vaultCount > 0;
             return (
@@ -80,7 +117,9 @@ export default function Analytics() {
                 </View>
                 {live ? (
                   <Text style={styles.rowValue}>
-                    {`${r.vaultCount}  ${compactUsd(r.tvlUsd)}  ${(r.projectedApyBps / 100).toFixed(1)}%`}
+                    {`${r.vaultCount}  ${compactSol(num(r.tvlSol))} SOL  ${
+                      r.apy30dMedianBps != null ? (r.apy30dMedianBps / 100).toFixed(1) : '-'
+                    }%`}
                   </Text>
                 ) : (
                   <Text style={styles.soon}>Coming soon</Text>
@@ -118,6 +157,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
+  kpiUsd: { fontSize: 11, fontWeight: '400', color: dark.mutedForeground },
   kpiLabel: { color: dark.mutedForeground, fontSize: 12 },
   list: {
     backgroundColor: dark.card,

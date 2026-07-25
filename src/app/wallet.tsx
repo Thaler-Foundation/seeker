@@ -1,7 +1,8 @@
 // Wallet sheet: mobile port of apps/web wallet-drawer.tsx with live API data.
 
-import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, Linking, StyleSheet } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { View, Text, ScrollView, Pressable, TextInput, Linking, Image, StyleSheet } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -53,6 +54,27 @@ function solInputToLamports(input: string): string | null {
   return lamports > 0n ? lamports.toString() : null;
 }
 
+function WalletGlyph() {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 1024 1024">
+      <Path
+        fillRule="evenodd"
+        fill={dark.foreground}
+        d="M 513.5 131.5 A 378 378 0 1 1 513.5 887.5 A 378 378 0 1 1 513.5 131.5 M 513.5 173.5 A 336 336 0 1 0 513.5 845.5 A 336 336 0 1 0 513.5 173.5 Z"
+      />
+      <Path
+        fillRule="evenodd"
+        fill={dark.foreground}
+        d="M 513 244 L 274 666 L 749 666 Z M 509 361 L 643 614 L 373 615 Z"
+      />
+    </Svg>
+  );
+}
+
+function SolMark() {
+  return <Image source={require('../../assets/images/solana-logo.png')} style={s.solMark} />;
+}
+
 function Segmented({
   options,
   value,
@@ -85,18 +107,23 @@ function ListRow({
   value,
   valueSub,
   border,
+  left,
 }: {
   title: string;
   sub: string;
   value?: string;
   valueSub?: string;
   border?: boolean;
+  left?: ReactNode;
 }) {
   return (
     <View style={[s.listRow, border && s.rowBorder]}>
-      <View style={{ gap: 2, flexShrink: 1 }}>
-        <Text style={s.rowTitle}>{title}</Text>
-        <Text style={s.rowSub}>{sub}</Text>
+      <View style={s.listRowL}>
+        {left}
+        <View style={{ gap: 2, flexShrink: 1 }}>
+          <Text style={s.rowTitle}>{title}</Text>
+          <Text style={s.rowSub}>{sub}</Text>
+        </View>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         {value ? <Text style={s.rowValue}>{value}</Text> : null}
@@ -247,8 +274,9 @@ export default function WalletSheet() {
       <ScrollView contentContainerStyle={s.scroll}>
         <View style={s.headRow}>
           <Pressable onPress={onCopy} style={s.rowL}>
+            <WalletGlyph />
             <Text style={s.addr}>{address ? shortAddr(address) : 'Wallet'}</Text>
-            <Text style={s.copyHint}>{copied ? 'Copied' : 'Copy wallet address'}</Text>
+            <Text style={s.copyHint}>{copied ? 'Copied' : 'Copy'}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={onDisconnect} style={s.btnOutline}>
             <Text style={s.btnOutlineLabel}>Disconnect</Text>
@@ -282,6 +310,7 @@ export default function WalletSheet() {
         <View style={s.list}>
           {secondary === 'balances' ? (
             <ListRow
+              left={<SolMark />}
               title="SOL"
               sub="Solana"
               value={solBalance.toFixed(9)}
@@ -294,6 +323,7 @@ export default function WalletSheet() {
               : vaultRows.map((r, i) => (
                   <ListRow
                     key={r.id}
+                    left={<View style={s.posDot} />}
                     title={r.label}
                     sub="Thaler vault"
                     value={`${r.sol.toFixed(4)} SOL`}
@@ -582,9 +612,13 @@ const s = StyleSheet.create({
   listRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: spacing.base,
     paddingVertical: 13,
   },
+  listRowL: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+  solMark: { width: 28, height: 28, borderRadius: 14 },
+  posDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: dark.mutedForeground },
   rowBorder: { borderTopColor: dark.border, borderTopWidth: 1 },
   rowTitle: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   rowSub: { color: dark.mutedForeground, fontSize: 12, lineHeight: 17 },
