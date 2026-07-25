@@ -394,7 +394,7 @@ export default function VaultDetail() {
                   <Text style={s.cardTitle}>Strategy Overview</Text>
                   <View style={s.bigStatGrid}>
                     <BigStat label="Liquidity Managed" value={tierLiquiditySol > 0 ? tierLiquiditySol.toFixed(2) : '-'} sub="SOL" />
-                    <BigStat label="30D APY" value={`${annualApy.toFixed(1)}%`} tone={brand.success} />
+                    <BigStat label="Projected APR" value={`${annualApy.toFixed(1)}%`} tone={brand.success} />
                     <BigStat label="Total Yield" value={tierTotalYieldSol.toFixed(3)} sub="SOL" tone={brand.success} />
                   </View>
                   <View style={s.factBlock}>
@@ -492,7 +492,7 @@ export default function VaultDetail() {
             <View style={s.card}>
               <Text style={s.cardTitle}>Vaults Info</Text>
               <View style={s.factBlock}>
-                <FactRow label="30D APY" value={`${annualApy.toFixed(1)}%`} />
+                <FactRow label="Projected APR" value={`${annualApy.toFixed(1)}%`} />
                 <FactRow label="Utilization" value={`${utilizationPct.toFixed(1)}%`} />
                 <FactRow label="Total Deposits" value={`${tierLiquiditySol.toFixed(2)} SOL`} />
               </View>
