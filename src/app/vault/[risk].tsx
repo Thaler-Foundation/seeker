@@ -114,10 +114,12 @@ type Breakdown = {
   lifetimeYieldSol?: number;
   pendingUsdcUsd?: number | null;
   apy30dMedianBps?: number | null;
+  avgMultiplyNetCarryBps?: number | null;
 };
 type AnalyticsResponse = {
   strategyBreakdown: Breakdown[];
   tvlByModeDaily?: { date: string; mode: string; tvlUsd: number }[];
+  apyByModeDaily?: { date: string; mode: string; apyBps: number }[];
 };
 type VaultRow = ListVaultsResponse['vaults'][number];
 
@@ -306,11 +308,24 @@ export default function VaultDetail() {
     refetchInterval: 30_000,
   });
 
-  const annualApy = breakdown
-    ? (Number.isFinite(breakdown.apy30dMedianBps ?? NaN)
-        ? (breakdown.apy30dMedianBps as number)
-        : breakdown.projectedApyBps) / 100
-    : 0;
+  // per-mode daily projected apr series, the same source the web charts use.
+  const modeApyDaily: [number, number][] = useMemo(
+    () =>
+      (analytics.data?.apyByModeDaily ?? [])
+        .filter((p) => p.mode === meta.mode)
+        .map((p) => [Date.parse(p.date), p.apyBps / 100] as [number, number])
+        .sort((a, b) => a[0] - b[0]),
+    [analytics.data, meta.mode]
+  );
+  const modeApyLatest = modeApyDaily.length ? modeApyDaily[modeApyDaily.length - 1]![1] : null;
+  const annualApy =
+    modeApyLatest != null
+      ? modeApyLatest
+      : breakdown
+        ? (Number.isFinite(breakdown.apy30dMedianBps ?? NaN)
+            ? (breakdown.apy30dMedianBps as number)
+            : breakdown.projectedApyBps) / 100
+        : 0;
   const utilizationPct = (breakdown?.utilization ?? 0) * 100;
   const tierLiquiditySol =
     breakdown?.tvlSol ?? (solPrice > 0 ? (breakdown?.tvlUsd ?? 0) / solPrice : 0);
@@ -327,8 +342,11 @@ export default function VaultDetail() {
       .sort((a, b) => a[0] - b[0]);
   }, [analytics.data, meta.mode, solPrice]);
   const apySeries: [number, number][] = useMemo(
-    () => (apyHistory.data?.points ?? []).map((p) => [p.ts, p.apyBps / 100]),
-    [apyHistory.data]
+    () =>
+      modeApyDaily.length
+        ? modeApyDaily
+        : (apyHistory.data?.points ?? []).map((p) => [p.ts, p.apyBps / 100] as [number, number]),
+    [modeApyDaily, apyHistory.data]
   );
 
   const medianApy = (APY_RANGE[tier].min + APY_RANGE[tier].max) / 2 / 100;
@@ -396,6 +414,15 @@ export default function VaultDetail() {
                     <BigStat label="Liquidity Managed" value={tierLiquiditySol > 0 ? tierLiquiditySol.toFixed(2) : '-'} sub="SOL" />
                     <BigStat label="Projected APR" value={`${annualApy.toFixed(1)}%`} tone={brand.success} />
                     <BigStat label="Total Yield" value={tierTotalYieldSol.toFixed(3)} sub="SOL" tone={brand.success} />
+                    <BigStat
+                      label="Average Loops Spread"
+                      value={
+                        breakdown?.avgMultiplyNetCarryBps != null
+                          ? `${(breakdown.avgMultiplyNetCarryBps / 100).toFixed(2)}%`
+                          : '-'
+                      }
+                      tone={brand.success}
+                    />
                   </View>
                   <View style={s.factBlock}>
                     <FactRow label="Collateral Asset" value={meta.lst} />
@@ -406,7 +433,7 @@ export default function VaultDetail() {
                 </View>
                 <VaultInfoCard tier={tier} />
                 <ChartBox title="Liquidity Managed" points={tvlSeries} color="#9945FF" legend="Liquidity managed (SOL)" />
-                <ChartBox title="APY" points={apySeries} color={meta.color} legend={`${meta.label} APY`} />
+                <ChartBox title="Projected APR" points={apySeries} color={meta.color} legend={`${meta.label} APR`} />
               </>
             ) : null}
 
@@ -451,7 +478,7 @@ export default function VaultDetail() {
           <>
             <View style={s.pillRow}>
               <SubPill label="Vaults" active={subTab === 'vaults'} onPress={() => { setSubTab('vaults'); }} />
-              <SubPill label="Liquidation Analysis" active={subTab === 'liquidation'} onPress={() => setSubTab('liquidation')} />
+              <SubPill label="Risk Summary" active={subTab === 'liquidation'} onPress={() => setSubTab('liquidation')} />
               <SubPill label="Transaction History" active={subTab === 'transactions'} onPress={() => setSubTab('transactions')} />
             </View>
             {!authenticated ? <Text style={s.muted}>Sign in to load your vaults.</Text> : null}
@@ -751,6 +778,7 @@ function PositionDetail({
   const managedSol = Number.isFinite(eq) ? Math.round(eq / LAMPORTS / 2) * 2 : 0;
   const depositSol = Number.isFinite(eq) ? eq / LAMPORTS : 0;
   const roi = depositSol > 0 ? (earnedSol / depositSol) * 100 : 0;
+  const netValueSol = depositSol + earnedSol;
   const daysHeld = Number.isFinite(p?.daysHeld ?? NaN) ? (p?.daysHeld as number) : 0;
   const claimableNet = statRow?.claimableNetSol ?? 0;
   const cp = p?.claimPreview ?? null;
@@ -796,10 +824,11 @@ function PositionDetail({
           />
           <BigStat label="ROI" value={`${roi.toFixed(2)}%`} tone={roi >= 0 ? brand.success : brand.warning} />
           <BigStat label="USDC Earned" value={`${pendingUsdc.toFixed(2)} USDC`} tone={pendingUsdc >= 0 ? brand.success : brand.warning} />
+          <BigStat label="Net Value" value={`${netValueSol.toFixed(4)}`} sub="SOL" />
         </View>
         <View style={s.factBlock}>
           <FactRow label="SOL Managed" value={`${managedSol} SOL`} />
-          <FactRow label="Days Held" value={daysHeld.toFixed(1)} />
+          <FactRow label="Days Active" value={daysHeld.toFixed(1)} />
         </View>
       </View>
 

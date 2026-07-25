@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { dark, tier, radius, spacing, brand } from '@/theme/tokens';
 
 const TIERS = [
@@ -37,6 +38,22 @@ export default function Home() {
   const tvlSol = stats.data?.ok ? stats.data.tvlSol : 0;
   const solPrice = stats.data?.ok ? stats.data.solPriceUsd : 0;
   const apy30 = stats.data?.ok ? toThirtyDayApy(stats.data.apy) : 0;
+  const { getToken, authenticated } = useAuth();
+  const analytics = useQuery({
+    queryKey: ['analytics'],
+    queryFn: async () =>
+      fetchThaler<{ apyByModeDaily?: { date: string; mode: string; apyBps: number }[] }>(
+        await getToken(),
+        endpoints.analytics
+      ),
+    enabled: authenticated,
+    staleTime: 60_000,
+  });
+  // safe tier projected apr from the daily series, same as the vault and dashboard.
+  const safePts = (analytics.data?.apyByModeDaily ?? [])
+    .filter((p) => p.mode === 'A')
+    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+  const safeApr = safePts.length ? safePts[safePts.length - 1]!.apyBps / 100 : apy30;
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -73,7 +90,7 @@ export default function Home() {
             Kamino lend carry plus a Pacifica delta-neutral hedge. Yield in any market direction.
           </Text>
           <View style={styles.featStats}>
-            <TopStat label="Projected APR" value={`${apy30.toFixed(2)}%`} tone={brand.success} />
+            <TopStat label="Projected APR" value={`${safeApr.toFixed(2)}%`} tone={brand.success} />
             <TopStat
               label="Deposited"
               value={tvlSol > 0 ? `${Math.round(tvlSol).toLocaleString()} SOL` : formatTvl(tvl)}
@@ -96,7 +113,7 @@ export default function Home() {
               </View>
               {t.live ? (
                 <Text style={styles.rowValue}>
-                  {`${apy30.toFixed(2)}%  ${formatTvl(tvl)}`}
+                  {`${safeApr.toFixed(2)}%  ${formatTvl(tvl)}`}
                 </Text>
               ) : (
                 <Text style={styles.soon}>Coming soon</Text>
