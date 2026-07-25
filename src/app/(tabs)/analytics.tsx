@@ -2,6 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import Svg, { Polyline } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import type { AnalyticsKpis, StrategyBreakdownRow } from '@/lib/contracts';
@@ -12,6 +13,10 @@ import { dark, tier, radius, spacing } from '@/theme/tokens';
 type AnalyticsResponse = {
   kpis: AnalyticsKpis;
   strategyBreakdown: StrategyBreakdownRow[];
+  tvlDailyUsd?: { date: string; tvlUsd: number }[];
+  apyByModeDaily?: { date: string; mode: string; apyBps: number }[];
+  venueAllocation?: { venue: string; pct: number }[];
+  assetAllocation?: { name: string; pct: number }[];
 };
 
 const MODE_META: Record<string, { label: string; color: string }> = {
@@ -42,6 +47,77 @@ function SolUsd({ sol, price }: { sol: number; price: number }) {
       {compactSol(sol)} SOL
       <Text style={styles.kpiUsd}> ({compactUsd(sol * price)})</Text>
     </Text>
+  );
+}
+
+function MiniChart({ data, color }: { data: [number, number][]; color: string }) {
+  if (data.length < 2) return <Text style={styles.chartEmpty}>No data yet.</Text>;
+  const xs = data.map((p) => p[0]);
+  const ys = data.map((p) => p[1]);
+  const x0 = Math.min(...xs);
+  const spanX = Math.max(...xs) - x0 || 1;
+  const yMin = Math.min(...ys);
+  const spanY = Math.max(...ys) - yMin || 1;
+  const pts = data
+    .map(
+      ([x, y]) =>
+        `${(((x - x0) / spanX) * 100).toFixed(2)},${(1 + (1 - (y - yMin) / spanY) * 38).toFixed(2)}`
+    )
+    .join(' ');
+  return (
+    <Svg width="100%" height={120} viewBox="0 0 100 40" preserveAspectRatio="none">
+      <Polyline points={pts} fill="none" stroke={color} strokeWidth={0.7} strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function ChartCard({
+  title,
+  sub,
+  data,
+  color,
+}: {
+  title: string;
+  sub: string;
+  data: [number, number][];
+  color: string;
+}) {
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>{title}</Text>
+      <Text style={styles.chartSub}>{sub}</Text>
+      <MiniChart data={data} color={color} />
+    </View>
+  );
+}
+
+function AllocList({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { name: string; pct: number; color: string }[];
+}) {
+  return (
+    <View style={styles.allocBlock}>
+      <Text style={styles.eyebrow}>{title}</Text>
+      {rows.length === 0 ? (
+        <Text style={styles.soon}>No active positions yet.</Text>
+      ) : (
+        rows.map((r) => (
+          <View key={r.name} style={styles.allocRow}>
+            <View style={[styles.dot, { backgroundColor: r.color }]} />
+            <Text style={styles.allocName}>{r.name}</Text>
+            <View style={styles.allocBarTrack}>
+              <View
+                style={[styles.allocBarFill, { width: `${Math.min(100, r.pct)}%`, backgroundColor: r.color }]}
+              />
+            </View>
+            <Text style={styles.allocPct}>{r.pct}%</Text>
+          </View>
+        ))
+      )}
+    </View>
   );
 }
 
@@ -88,6 +164,29 @@ export default function Analytics() {
     { label: 'Active Vaults', value: k ? String(k.activeVaultCount) : '-' },
   ];
 
+  // total tvl over time in sol, the safe tier daily projected apr, and the
+  // asset + venue allocation, the same data the web analytics sections use.
+  const tvlSeries: [number, number][] = (q.data?.tvlDailyUsd ?? [])
+    .filter((p) => p.tvlUsd > 0)
+    .map((p) => [Date.parse(p.date), solPrice > 0 ? p.tvlUsd / solPrice : 0] as [number, number])
+    .sort((a, b) => a[0] - b[0]);
+  const aprSeries: [number, number][] = (q.data?.apyByModeDaily ?? [])
+    .filter((p) => p.mode === 'A')
+    .map((p) => [Date.parse(p.date), p.apyBps / 100] as [number, number])
+    .sort((a, b) => a[0] - b[0]);
+  const ASSET_COLOR: Record<string, string> = { jitoSOL: '#4ADE80', mSOL: '#166534', SOL: '#9945FF' };
+  const VENUE_COLOR: Record<string, string> = { hyperliquid: '#50E3C2', pacifica: '#3B7BBE', kamino: '#00BCD4' };
+  const assetRows = (q.data?.assetAllocation ?? []).map((a) => ({
+    name: a.name,
+    pct: a.pct,
+    color: ASSET_COLOR[a.name] ?? '#6b7280',
+  }));
+  const venueRows = (q.data?.venueAllocation ?? []).map((v) => ({
+    name: v.venue.charAt(0).toUpperCase() + v.venue.slice(1),
+    pct: v.pct,
+    color: VENUE_COLOR[v.venue.toLowerCase()] ?? '#6b7280',
+  }));
+
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -104,6 +203,13 @@ export default function Analytics() {
               <Text style={styles.kpiLabel}>{c.label}</Text>
             </View>
           ))}
+        </View>
+        <ChartCard title="Total Value Locked" sub="protocol tvl in sol" data={tvlSeries} color="#9945FF" />
+        <ChartCard title="Projected APR" sub="safe tier daily" data={aprSeries} color={tier.safe} />
+        <View style={styles.list}>
+          <AllocList title="ASSET ALLOCATION" rows={assetRows} />
+          <View style={styles.allocDivider} />
+          <AllocList title="VENUE ALLOCATION" rows={venueRows} />
         </View>
         <View style={styles.list}>
           <Text style={[styles.eyebrow, { padding: spacing.base, paddingBottom: 8 }]}>
@@ -182,4 +288,22 @@ const styles = StyleSheet.create({
   rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   rowValue: { color: dark.foreground, fontSize: 12, fontVariant: ['tabular-nums'] },
   soon: { color: dark.mutedForeground, fontSize: 12 },
+  chartCard: {
+    backgroundColor: dark.card,
+    borderColor: dark.border,
+    borderWidth: 1,
+    borderRadius: radius.xl + 2,
+    padding: spacing.base,
+    gap: 6,
+  },
+  chartTitle: { color: dark.foreground, fontSize: 15, fontWeight: '600' },
+  chartSub: { color: dark.mutedForeground, fontSize: 12 },
+  chartEmpty: { color: dark.mutedForeground, fontSize: 13, textAlign: 'center', paddingVertical: 40 },
+  allocBlock: { padding: spacing.base, gap: 10 },
+  allocRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  allocName: { color: dark.foreground, fontSize: 13, width: 92 },
+  allocBarTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: dark.muted, overflow: 'hidden' },
+  allocBarFill: { height: 6, borderRadius: 3 },
+  allocPct: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'], width: 44, textAlign: 'right' },
+  allocDivider: { height: 1, backgroundColor: dark.border },
 });
