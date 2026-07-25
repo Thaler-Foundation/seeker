@@ -70,6 +70,9 @@ export default function Analytics() {
   // live price, else the price implied by the server rows.
   const livePrice = pub.data?.ok ? pub.data.solPriceUsd : 0;
   const solPrice = livePrice > 0 ? livePrice : totalTvlSol > 0 ? sumTvlUsd / totalTvlSol : 0;
+  // total yield generated includes the pending unswapped usdc, same as the vault.
+  const totalPendingUsdcUsd = breakdown.reduce((s, r) => s + num(r.pendingUsdcUsd), 0);
+  const totalYieldGenSol = totalYieldSol + (solPrice > 0 ? totalPendingUsdcUsd / solPrice : 0);
   const KPIS: { label: string; value?: string; node?: ReactNode }[] = [
     {
       label: 'Total Value Locked',
@@ -79,7 +82,7 @@ export default function Analytics() {
     { label: 'Protocol ROI', value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-' },
     {
       label: 'Yield Generated',
-      node: k ? <SolUsd sol={totalYieldSol} price={solPrice} /> : undefined,
+      node: k ? <SolUsd sol={totalYieldGenSol} price={solPrice} /> : undefined,
       value: k ? undefined : '-',
     },
     { label: 'Active Vaults', value: k ? String(k.activeVaultCount) : '-' },
