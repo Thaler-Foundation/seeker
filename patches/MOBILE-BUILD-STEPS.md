@@ -1,102 +1,156 @@
 # thaler seeker build, wiring, and screen parity
 
-plain steps for the mobile dev to finish this app so it mirrors the current
-web ui at thaler.finance. no secrets, tokens, or keys go in the app or the repo.
+checked against the production backend on 2026-08-17.
 
 ## how the data flows
 
-the app never talks to pacifica, kamino, or the neon db directly. it calls the
-deployed next bff at EXPO_PUBLIC_BFF_URL (default https://thaler.finance) and
-sends only the user privy token. the bff reads the quant cache, and the quant
-cache reads the neon db that the backend keeps filled. so the app shows the same
-cached numbers the web app shows. the x-api-key stays on the server and never
-ships inside the app binary.
+the app never talks to the trading backend directly. it calls the website,
+which holds the session and forwards the call on.
+
+    app  ->  https://thaler.finance/api/...  ->  backend on railway
+
+set the website address in `EXPO_PUBLIC_BFF_URL`. the app falls back to
+`https://thaler.finance` when it is not set.
+
+sign in is privy. every private call sends the privy token. the public ones
+(`/api/stats`, `/api/apy-history`) take no token.
 
 ## api wiring
 
-1. every endpoint the app uses is in src/lib/api.ts, in the `endpoints` object.
-   every one maps to a real route under /api on the bff. verified present.
-2. every response type comes from @thaler/contracts (workspace package). keep the
-   screen reads matching those types. when the backend adds a field, it appears
-   here after a contracts build.
-3. every call goes through fetchThaler(token, path). pass the privy token from
-   getToken(). the public routes (/api/stats, /api/apy-history) take no token.
-4. do not add x-api-key, bearer secrets, api keys, or wallet keys anywhere in the
-   app or the repo.
+1. every route the app uses is listed in `src/lib/api.ts`, in the `endpoints`
+   object. there are 23 of them. all 23 were checked against the website on
+   2026-08-17 and all 23 exist.
+2. response types live in `src/lib/contracts.ts`. they are a hand kept copy of
+   the backend types, not a package install. there is no `@thaler` dependency
+   in this repo. when the backend adds or changes a field, copy the change into
+   that file by hand. an earlier version of this page said the types come from a
+   workspace package. that was wrong.
+3. every call goes through `fetchThaler(token, path)`. pass the privy token from
+   `getToken()`.
+4. never put an api key, a bearer secret, or a wallet key in the app or the repo.
 
-## screen parity (what each screen must show, to match the web)
+### the 23 routes
 
-the web replaced per vault apy with roi, and renamed the strategy apy to
-projected apr. sol amounts are primary with a live usd in parentheses. this repo
-is now wired that way. keep it that way.
+reading:
 
-1. home: featured card stat is "Projected APR" from /api/stats apy. all vaults
-   rows show that same percent plus tvl.
-2. analytics: kpis are Total Value Locked, Protocol ROI, Yield Generated, Active
-   Vaults. tvl and yield are sol primary with a live usd in parentheses, summed
-   from strategyBreakdown tvlSol and lifetimeYieldSol. the price is /api/stats
-   solPriceUsd, falling back to sum(tvlUsd)/sum(tvlSol). protocol roi is
-   kpis.roiPct. the per mode row shows count, tvlSol, and apy30dMedianBps as the
-   projected apr percent.
-3. portfolio: kpis are Net Value, Yield Earned, Claimable Yield, Active Vaults,
-   ROI. roi is sum(realized yield)/sum(deposit) times 100, where deposit is the
-   vaults list equityLamports joined by id. each vault row shows net value, roi,
-   yield, ltv.
-4. vault detail: overview stat and advanced factrow are "Projected APR". the
-   backtest stat is "Avg. Projected APR". the position stat and the risk summary
-   show "ROI" (realized yield over deposit). the per tier table column is "ROI".
-5. create: the preview row is "Projected APR (net)". the range value is still a
-   placeholder; wire it to /api/thaler/vaults/preview to make it live.
+    publicStats          /api/stats
+    apyHistory           /api/apy-history?tier=&days=
+    vaults               /api/thaler/vaults
+    vaultState           /api/thaler/vaults/{id}
+    vaultPositions       /api/thaler/vaults/{id}/positions
+    vaultStats           /api/thaler/vault-stats
+    dualWallet           /api/thaler/dual-wallet
+    dualWalletBalance    /api/thaler/dual-wallet/balance
+    solPrice             /api/thaler/sol-price
+    triggers             /api/thaler/modes/triggers
+    scalps               /api/thaler/modes/scalps
+    analytics            /api/thaler/analytics
+    equityHistory        /api/thaler/analytics/equity-history?days=
+    vaultPreview         /api/thaler/vaults/preview?equityLamports=&tier=
 
-## env (put real values in a local .env file, never commit them)
+acting:
 
-1. EXPO_PUBLIC_PRIVY_APP_ID     required, from the privy dashboard.
-2. EXPO_PUBLIC_PRIVY_CLIENT_ID  the mobile client id from the privy dashboard.
-3. EXPO_PUBLIC_BFF_URL          defaults to https://thaler.finance. set a staging
-   url here to point at a test backend.
+    vaultWallets         /api/thaler/vault-wallets            makes the vault wallet
+    vaults               /api/thaler/vaults                   opens the vault
+    vaultClaim           /api/thaler/vaults/{id}/claim
+    vaultClose           /api/thaler/vaults/{id}/close
+    vaultResume          /api/thaler/vaults/{id}/resume
+    vaultDismantle       /api/thaler/vaults/{id}/dismantle
+    walletExport         /api/thaler/wallets/export
+    recoveryTransfer     /api/thaler/wallets/recovery/transfer-vault-to-dual
+    recoveryClose        /api/thaler/wallets/recovery/close-vault-wallet
+    recoveryWithdraw     /api/thaler/wallets/recovery/withdraw-to-external
+
+### routes the website has that the app does not use yet
+
+these exist and work. they are listed so nobody rebuilds them by hand.
+
+    /api/funding-rates
+    /api/fx/rates
+    /api/thaler/modes/repays
+    /api/thaler/quant/series
+    /api/thaler/quant/vaults
+    /api/thaler/quant/vaults/{signer}/history
+    /api/thaler/quant/vaults/{signer}/series
+
+the `/api/thaler/analytics/operator` and `/api/thaler/quant/operator` routes are
+for the internal dashboard and are not meant for the app.
+
+## what changed in the backend since this repo was last updated
+
+the repo was last pushed on 2026-07-25. these landed after that.
+
+1. a vault whose close failed no longer counts as an open vault. the vault count
+   and the total value on the analytics screen both drop by one because of it.
+   nothing to change in the app, the numbers just get smaller and correct.
+2. net carry can now come back as null when the staking rate is unknown. it used
+   to come back as zero, which read as a real number and was wrong. show a dash
+   for null, never a zero.
+3. the position tab no longer has an lp pool box, and the breakdown card that
+   said "pacifica" now says "kamino multiply".
+4. vault links are per tier, and create, claim and close are open to all testers.
+5. `VaultSummary` gained six fields. they are in `src/lib/contracts.ts` now:
+   `walletAddress`, `multiplyLeverageBps`, `leverageBps`, `stepsTotal`,
+   `stepsCompleted`, `failedStep`. the step counts drive the building state while
+   a vault opens, and `failedStep` says which step stopped it.
+
+## screens
+
+five tabs plus two stacks: home, portfolio, create, analytics, wallet, and the
+vault detail at `/vault/{risk}`.
+
+each screen must show what the website shows for the same data. open the website
+side by side when checking.
+
+## env
+
+put real values in a local `.env` file. never commit it.
+
+    EXPO_PUBLIC_BFF_URL=https://thaler.finance
+    EXPO_PUBLIC_PRIVY_APP_ID=
+    EXPO_PUBLIC_PRIVY_CLIENT_ID=
 
 ## run it locally
 
-1. bun install
-2. bunx expo start, then open on the seeker device or an android emulator.
+    bun install
+    bun run start
 
-## checks to run before every commit
+## checks before every commit
 
-1. bunx tsc --noEmit      must be zero errors.
-2. bunx expo export -p android    must build the hermes bundle with no error.
+    bunx tsc --noEmit
 
-## build for the solana dapp store (eas)
+## build for the solana dapp store
 
-1. install the eas cli: bun add -g eas-cli (or run bunx eas-cli).
-2. eas login
-3. eas build:configure once, to create eas.json.
-4. eas build -p android --profile production, this builds the android aab.
-5. download the aab, then submit it to the solana dapp store with the dapp store
-   cli or the publisher portal. the android package is finance.thaler.seeker and
-   the version is in app.json.
-6. bump the version in app.json for each new store release.
+the app id is `finance.thaler.seeker`, the link scheme is `thalerseeker`, and the
+name is "Thaler Seeker". build with eas.
 
-## still to finish
+## design
 
-1. wire the create preview range value to /api/thaler/vaults/preview so it is
+the figma file is `zWDlvcaKwmnzMAfd387fF8`, page "Cover & Foundations". the
+account has a full seat, so the file opens for editing and for reading colours,
+spacing and components.
+
+## to do
+
+1. sync the six new `VaultSummary` fields into the screens. show the building
+   state from `stepsCompleted` and `stepsTotal` while a vault opens, and show
+   which step stopped it from `failedStep` when an open fails.
+2. show a dash, not a zero, wherever net carry comes back as null. this applies
+   to the vault detail health line and to any place the carry number is shown.
+3. drop the lp pool box from the position tab and rename the breakdown card from
+   "pacifica" to "kamino multiply", to match the website.
+4. wire the create preview range to `/api/thaler/vaults/preview` so the number is
    live instead of a placeholder.
-2. the portfolio and vault tables show four values per row on a narrow phone; add
-   column headers or a horizontal scroll so each value is labeled.
-3. the wallet screen design and data wiring now mirror the web wallet drawer
-   (thaler glyph, sol icon, position dots, balances, positions, activity,
-   withdraw form, export). verify the live numbers once you have a funded test
-   account.
-4. the legal terms gate is now in place: the "Vault creation agreement" modal
-   (src/components/terms-modal.tsx, ported verbatim from the web) opens on "Open
-   Vault", the user scrolls to the bottom and ticks accept, then the vault wallet
-   is created. keep the agreement text in sync if the web copy changes.
-5. after the vault build finishes the create screen now routes to the portfolio
-   tab, the same as the web.
+5. the portfolio and vault tables show four values per row on a narrow phone. add
+   column headers or let the row scroll sideways so every value is labelled.
+6. check the wallet screen against a funded test account. the layout and the
+   wiring are done, the live numbers are not confirmed.
+7. keep the vault creation agreement text the same as the website. it is in
+   `src/components/terms-modal.tsx`.
+8. read colours, spacing and icons from the figma file rather than by eye.
+9. after any backend change, re-check `src/lib/contracts.ts` by hand against the
+   backend types. nothing updates it automatically.
 
 ## notes
 
-1. metro.config.js pins the browser condition names first so the jose dep inside
-   the privy sdk loads its browser build. do not remove that line.
-2. the app targets android only (solana seeker). ios is not a target.
-3. auth is privy email otp plus the bff allowlist gate at /api/auth/allowlist. a
-   user must be on the allowlist to load their data.
+the app holds no keys. it asks the website, the website asks the backend.

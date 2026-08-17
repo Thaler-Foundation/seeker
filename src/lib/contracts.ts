@@ -76,14 +76,32 @@ export type VaultMetrics = {
   pendingRecycleUsd?: number | null;
 };
 
+// The step that stopped an open, when one failed.
+export type FailedStepRef = {
+  stepNumber: number;
+  kind: string;
+  error: string | null;
+};
+
 export type VaultSummary = {
   id: string;
+  // Vault wallet, used to match a vault to its perp position.
+  walletAddress: string;
   state: VaultExecutionState;
   equityLamports: string;
   ltvBps: number;
+  // Multiply leverage the vault was opened with.
+  multiplyLeverageBps: number;
+  leverageBps: number;
+  // Strategy tier the vault was opened with. Null on rows opened before the
+  // column existed; read those as 'safe'.
   tier: Tier | null;
   createdAt: number;
   updatedAt: number;
+  // Open progress, for the building state on the create and portfolio screens.
+  stepsTotal: number;
+  stepsCompleted: number;
+  failedStep: FailedStepRef | null;
   latestClaim: ChildExecutionRef | null;
   latestClose: ChildExecutionRef | null;
   latestDismantle: ChildExecutionRef | null;
