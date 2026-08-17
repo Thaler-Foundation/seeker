@@ -75,8 +75,9 @@ error reads "deposit for tier X must be between MIN and MAX SOL".
 | yolo | 8 | 1111 |
 
 this repo used to post a hardcoded 2 SOL on the safe tier, which is under the
-6 SOL floor, so every open was rejected. the amount is now 6. the screen still
-sends a fixed amount on the safe tier only.
+6 SOL floor, so every open was rejected. the create screen now picks any of the
+six tiers and takes a typed amount, checked against this table before the open
+button unlocks.
 
 ## env (put real values in a local .env file, never commit them)
 
@@ -122,9 +123,13 @@ sends a fixed amount on the safe tier only.
    is created. keep the agreement text in sync if the web copy changes.
 5. after the vault build finishes the create screen now routes to the portfolio
    tab, the same as the web.
-6. the create screen sends a fixed 6 SOL on the safe tier. the web lets the user
-   type any amount and pick any of the six tiers. build the tier picker and the
-   amount input, and validate against the per tier table above before posting.
+6. done. the create screen now has a risk profile picker for all six tiers and a
+   typed amount. picking a tier resets the amount to that tier's minimum, the
+   same as the web panel. the amount is checked against the per tier table
+   before the button unlocks, and the selected tier and amount are what get
+   posted. the helpers live in src/lib/contracts.ts as TIER_DEPOSIT_BOUNDS,
+   minDepositSol, maxDepositSol and isDepositWithinBounds, mirroring
+   apps/web/src/lib/vaults/mode-a.ts.
 7. the web has no resume button left; its useResumeVault hook is exported but no
    screen calls it. this app still shows Retry next to Close vault on a failed
    build. decide whether to keep it before release. the POST /resume route is

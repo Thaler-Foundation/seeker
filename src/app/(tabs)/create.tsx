@@ -1,19 +1,41 @@
-// Create: staged deposit flow, fixed 2 SOL, 0.06 SOL reserve.
+// Create: staged deposit flow, per tier amount, 0.06 SOL reserve.
 
 import { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Image, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
+import {
+  TIER_ORDER,
+  minDepositSol,
+  maxDepositSol,
+  isDepositWithinBounds,
+  type Tier,
+} from '@/lib/contracts';
 import { useAuth } from '@/lib/auth';
 import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
 import { TermsModal } from '@/components/terms-modal';
 
-// Safe tier minimum from TIER_PARAMS.
-const FIXED_SOL = 6;
-const EQUITY_LAMPORTS = String(FIXED_SOL * 1_000_000_000);
 const RESERVE_SOL = 0.06;
+
+const TIER_LABEL: Record<Tier, string> = {
+  safe: 'Safe',
+  conservative: 'Conservative',
+  balanced: 'Balanced',
+  optimistic: 'Optimistic',
+  aggressive: 'Aggressive',
+  yolo: 'YOLO',
+};
+
+const TIER_APR: Record<Tier, { min: number; max: number }> = {
+  safe: { min: 8.2, max: 13.8 },
+  conservative: { min: 8.4, max: 14.1 },
+  balanced: { min: 8.7, max: 14.8 },
+  optimistic: { min: 9.1, max: 15.6 },
+  aggressive: { min: 9.6, max: 17.2 },
+  yolo: { min: 10.2, max: 19.8 },
+};
 
 const STEP_LABELS: Record<string, string> = {
   kamino_lut_setup: 'Waking up the devs',
@@ -47,22 +69,36 @@ export default function Create() {
   const [pairId, setPairId] = useState<string | null>(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<Tier>('safe');
+  const [amount, setAmount] = useState(String(minDepositSol('safe')));
+
+  const minSol = minDepositSol(selectedTier);
+  const maxSol = maxDepositSol(selectedTier);
+  const depositSol = parseFloat(amount) || 0;
+  const withinBounds = isDepositWithinBounds(selectedTier, depositSol);
+  const equityLamports = String(Math.round(depositSol * 1_000_000_000));
+
+  // Switching tier resets the amount to that tier's minimum, like the web panel.
+  const pickTier = (t: Tier) => {
+    setSelectedTier(t);
+    setAmount(String(minDepositSol(t)));
+  };
 
   const pub = useQuery({
     queryKey: ['public-stats'],
     queryFn: () => fetchThaler<PublicStats>(null, endpoints.publicStats),
     staleTime: 30_000,
   });
-  const usd = pub.data?.ok ? FIXED_SOL * pub.data.solPriceUsd : 0;
+  const usd = pub.data?.ok ? depositSol * pub.data.solPriceUsd : 0;
 
   const preview = useQuery({
-    queryKey: ['vault-preview', EQUITY_LAMPORTS],
+    queryKey: ['vault-preview', equityLamports, selectedTier],
     queryFn: async () =>
       fetchThaler<PreviewResponse>(
         await getToken(),
-        endpoints.vaultPreview(EQUITY_LAMPORTS, 'safe')
+        endpoints.vaultPreview(equityLamports, selectedTier)
       ),
-    enabled: authenticated,
+    enabled: authenticated && withinBounds,
     staleTime: 30_000,
   });
 
@@ -85,7 +121,7 @@ export default function Create() {
     enabled: authenticated && stage === 'fund',
     refetchInterval: 5000,
   });
-  const requiredLamports = FIXED_SOL * 1e9 + RESERVE_SOL * 1e9;
+  const requiredLamports = depositSol * 1e9 + RESERVE_SOL * 1e9;
   const currentLamports = Number(balance.data?.lamports ?? '0');
   const funded = currentLamports >= requiredLamports;
 
@@ -93,7 +129,7 @@ export default function Create() {
     mutationFn: async () =>
       fetchThaler<OpenResponse>(await getToken(), endpoints.vaults, {
         method: 'POST',
-        body: JSON.stringify({ pairId, equityLamports: EQUITY_LAMPORTS, tier: 'safe' }),
+        body: JSON.stringify({ pairId, equityLamports, tier: selectedTier }),
       }),
     onSuccess: (r) => {
       setExecutionId(r.executionId);
@@ -140,8 +176,28 @@ export default function Create() {
             <View style={styles.rowBetween}>
               <Text style={styles.panelTitle}>Create Vault</Text>
               <View style={styles.chip}>
-                <Text style={styles.chipLabel}>Safe</Text>
+                <Text style={styles.chipLabel}>{TIER_LABEL[selectedTier]}</Text>
               </View>
+            </View>
+            <Text style={styles.eyebrow}>RISK PROFILE</Text>
+            <View style={styles.tierPicker}>
+              {TIER_ORDER.map((t) => (
+                <Pressable
+                  key={t}
+                  accessibilityRole="button"
+                  onPress={() => pickTier(t)}
+                  style={[
+                    styles.tierChip,
+                    selectedTier === t && { borderColor: tier[t], backgroundColor: `${tier[t]}22` },
+                  ]}
+                >
+                  <Text
+                    style={[styles.tierChipLabel, selectedTier === t && { color: tier[t] }]}
+                  >
+                    {TIER_LABEL[t]}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
             <View style={styles.depositBox}>
               <View style={styles.rowBetween}>
@@ -156,9 +212,21 @@ export default function Create() {
                   />
                   <Text style={styles.sol}>SOL</Text>
                 </View>
-                <Text style={styles.amount}>{FIXED_SOL}</Text>
+                <TextInput
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                  inputMode="decimal"
+                  accessibilityLabel="Deposit amount in SOL"
+                  selectTextOnFocus
+                  style={styles.amountInput}
+                  placeholder={String(minSol)}
+                  placeholderTextColor={dark.mutedForeground}
+                />
               </View>
-              <Text style={styles.mutedSm}>Safe tier accepts 6 to 1111 SOL</Text>
+              <Text style={[styles.mutedSm, !withinBounds && { color: brand.error }]}>
+                {`${TIER_LABEL[selectedTier]} tier accepts ${minSol} to ${maxSol} SOL`}
+              </Text>
             </View>
             <Text style={styles.eyebrow}>WHERE YOUR SOL GOES</Text>
             <Text style={styles.prose}>
@@ -167,10 +235,21 @@ export default function Create() {
               so returns do not depend on the SOL price.
             </Text>
             <View style={styles.miniRows}>
-              <MiniRow label="Projected APR (net)" value="8.2% to 13.8%" tone={brand.success} />
+              <MiniRow
+                label="Projected APR (net)"
+                value={`${TIER_APR[selectedTier].min}% to ${TIER_APR[selectedTier].max}%`}
+                tone={brand.success}
+              />
               <MiniRow
                 label="Projected Earnings (annual)"
-                value={preview.isLoading && authenticated ? '...' : '+0.49 to 0.83 SOL'}
+                value={
+                  preview.isLoading && authenticated
+                    ? '...'
+                    : `+${((depositSol * TIER_APR[selectedTier].min) / 100).toFixed(2)} to ${(
+                        (depositSol * TIER_APR[selectedTier].max) /
+                        100
+                      ).toFixed(2)} SOL`
+                }
                 tone={brand.success}
               />
               <MiniRow label="Service Fee" value="11% (on yield)" />
@@ -178,16 +257,16 @@ export default function Create() {
             </View>
             <Pressable
               accessibilityRole="button"
-              disabled={!authenticated || createWallets.isPending}
+              disabled={!authenticated || !withinBounds || createWallets.isPending}
               onPress={() => setTermsOpen(true)}
               style={({ pressed }) => [
                 styles.cta,
-                (!authenticated || createWallets.isPending) && { opacity: 0.5 },
+                (!authenticated || !withinBounds || createWallets.isPending) && { opacity: 0.5 },
                 pressed && { opacity: 0.9 },
               ]}
             >
               <Text style={styles.ctaLabel}>
-                {createWallets.isPending ? 'Preparing...' : `Open Vault · ${FIXED_SOL} SOL`}
+                {createWallets.isPending ? 'Preparing...' : `Open Vault · ${depositSol} SOL`}
               </Text>
             </Pressable>
           </View>
@@ -207,7 +286,7 @@ export default function Create() {
                     label="Thaler Wallet Balance"
                     value={`${(currentLamports / 1e9).toFixed(4)} SOL`}
                   />
-                  <MiniRow label="Deployed to strategy" value={`${FIXED_SOL.toFixed(2)} SOL`} />
+                  <MiniRow label="Deployed to strategy" value={`${depositSol.toFixed(2)} SOL`} />
                   <MiniRow
                     label="Fee reserve (one-time)"
                     value={`${RESERVE_SOL.toFixed(2)} SOL`}
@@ -230,7 +309,7 @@ export default function Create() {
                 <Text style={styles.eyebrow}>SEND EXACTLY</Text>
                 <Text style={styles.amount}>{`${(requiredLamports / 1e9).toFixed(2)} SOL`}</Text>
                 <View style={styles.miniRows}>
-                  <MiniRow label="Vault equity" value={`${FIXED_SOL.toFixed(2)} SOL`} />
+                  <MiniRow label="Vault equity" value={`${depositSol.toFixed(2)} SOL`} />
                   <MiniRow
                     label="Fee reserve (network + setup)"
                     value={`${RESERVE_SOL.toFixed(2)} SOL`}
@@ -388,6 +467,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
+  amountInput: {
+    color: dark.foreground,
+    fontSize: 30,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+    minWidth: 120,
+    padding: 0,
+  },
+  tierPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  tierChip: {
+    borderColor: dark.border,
+    borderWidth: 1,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  tierChipLabel: { color: dark.mutedForeground, fontSize: 12, fontWeight: '600' },
   eyebrow: { color: dark.mutedForeground, fontSize: 10, letterSpacing: 1.4, fontWeight: '600' },
   prose: { color: dark.mutedForeground, fontSize: 13, lineHeight: 19 },
   miniRows: { gap: 8, borderTopColor: dark.border, borderTopWidth: 1, paddingTop: spacing.md },

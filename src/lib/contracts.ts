@@ -52,6 +52,38 @@ export type Tier =
   | 'aggressive'
   | 'yolo';
 
+export const TIER_ORDER: Tier[] = [
+  'safe',
+  'conservative',
+  'balanced',
+  'optimistic',
+  'aggressive',
+  'yolo',
+];
+
+// Mirrors TIER_PARAMS minDepositSol/maxDepositSol. The API rejects anything
+// outside these, in packages/contracts/src/vaults.ts and again in the route.
+export const TIER_DEPOSIT_BOUNDS: Record<Tier, { minSol: number; maxSol: number }> = {
+  safe: { minSol: 6, maxSol: 1111 },
+  conservative: { minSol: 6, maxSol: 1111 },
+  balanced: { minSol: 8, maxSol: 1111 },
+  optimistic: { minSol: 11, maxSol: 1112 },
+  aggressive: { minSol: 9, maxSol: 1111 },
+  yolo: { minSol: 8, maxSol: 1111 },
+};
+
+export function minDepositSol(t: Tier): number {
+  return TIER_DEPOSIT_BOUNDS[t].minSol;
+}
+
+export function maxDepositSol(t: Tier): number {
+  return TIER_DEPOSIT_BOUNDS[t].maxSol;
+}
+
+export function isDepositWithinBounds(t: Tier, sol: number): boolean {
+  return sol >= minDepositSol(t) && sol <= maxDepositSol(t);
+}
+
 export type VaultExecutionState =
   | 'PENDING'
   | 'RUNNING'
