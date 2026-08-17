@@ -146,7 +146,7 @@ Route: (protected)/portfolio/page.tsx. Supersedes the /vaults listing.
     Earned (12.48 USDC green) / Net APY with ORIGINAL case, FactRows 83:702
     (SOL Managed 2 SOL, Days Held 34.0). DONE.
 11. Wiring patch em-dash lines: verified byte-identical copies of Finance
-    production files (only @thaler/sdk -> @/lib/sdk import swaps differ), so
+    production files (only the import swaps differ; the types now live in src/lib/contracts.ts), so
     they are production comments, kept verbatim; commit message and pr-body.md
     verified clean. No patch change.
 12. Seeker src header comments shrunk to one line each, 11 files. DONE.

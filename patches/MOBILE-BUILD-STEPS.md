@@ -16,9 +16,10 @@ ships inside the app binary.
 
 1. every endpoint the app uses is in src/lib/api.ts, in the `endpoints` object.
    every one maps to a real route under /api on the bff. verified present.
-2. every response type comes from @thaler/contracts (workspace package). keep the
-   screen reads matching those types. when the backend adds a field, it appears
-   here after a contracts build.
+2. every response type lives in src/lib/contracts.ts. it is a copy kept by hand,
+   not an installed package, so nothing updates it on its own. after a backend
+   change, copy the change across by hand. an earlier version of this page said
+   the types come from a workspace package. that was wrong.
 3. every call goes through fetchThaler(token, path). pass the privy token from
    getToken(). the public routes (/api/stats, /api/apy-history) take no token.
 4. do not add x-api-key, bearer secrets, api keys, or wallet keys anywhere in the

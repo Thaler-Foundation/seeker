@@ -9,9 +9,10 @@ zWDlvcaKwmnzMAfd387fF8).
   auth flow, data layer, static-content policy, build gates.
 - [app-screens.md](app-screens.md): every screen as built, its production
   counterpart file:line, and its data sources and mutations.
-- [api-map.md](api-map.md): BFF endpoint map used by src/lib/api.ts, with
-  coverage proof against the backend OpenAPI 0.0.2 spec
-  (docs/backend-openapi.yaml, 42 paths / 47 ops).
+- [api-map.md](api-map.md): screen to backend operation map, against the
+  OpenAPI 0.0.2 spec (docs/backend-openapi.yaml, 42 paths / 47 ops). The app
+  reaches these through the website, see how the data flows in
+  MOBILE-BUILD-STEPS.md.
 - [tokens.md](tokens.md): color, spacing, radius, and type tokens mirrored from
   apps/web globals.css and tier-meta.ts.
 - [mobile-platform.md](mobile-platform.md): Solana Mobile / Seeker platform

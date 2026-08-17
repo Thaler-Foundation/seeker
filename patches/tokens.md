@@ -32,16 +32,29 @@ Dark is the default theme (next-themes `defaultTheme='dark'`, no system).
 Status runtime vars: `--thaler-positive #10b981`, `--thaler-negative #ef4444`,
 `--thaler-warning #f59e0b` (identical both themes).
 
-## Strategy tier palette (tier-meta.ts:17-96, the single source of truth)
+## Strategy tier palette (apps/web/src/lib/vaults/tier-meta.ts)
 
-| Tier | Mode | Hex | Risk | LTV % | Multiply | Perp lev | Health | Venue |
-|---|---|---|---|---|---|---|---|---|
-| Safe | A | `#99BBFF` | Low | 50 | 1.2x | 5x | 1.85 | Pacifica |
-| Conservative | B | `#99FFDD` | Low | 52 | 1.3x | 5x | 1.65 | Pacifica |
-| Balanced | C | `#BBFF99` | Medium | 54 | 1.4x | 6x | 1.45 | Pacifica |
-| Optimistic | D | `#FFDD99` | Medium | 56 | 1.5x | 6x | 1.35 | Hyperliquid |
-| Aggressive | E | `#FF99BB` | High | 58 | 1.6x | 6.9x | 1.28 | Hyperliquid |
-| YOLO | F | `#DD99FF` | High | 60 | 1.8x | 7.5x | 1.18 | Hyperliquid |
+| Tier | Mode | Hex | Risk | Multiply | Perp lev | Health | Venue |
+|---|---|---|---|---|---|---|---|
+| Safe | A | `#99BBFF` | Low | 1.2x | 5x | 1.85 | Pacifica |
+| Conservative | B | `#99FFDD` | Low | 1.3x | 5x | 1.65 | Pacifica |
+| Balanced | C | `#BBFF99` | Medium | 1.4x | 6x | 1.45 | Pacifica |
+| Optimistic | D | `#FFDD99` | Medium | 1.5x | 6x | 1.35 | Hyperliquid |
+| Aggressive | E | `#FF99BB` | High | 1.6x | 6.9x | 1.28 | Hyperliquid |
+| YOLO | F | `#DD99FF` | High | 1.8x | 7.5x | 1.18 | Hyperliquid |
+
+The borrow LTV cap per tier is NOT in tier-meta.ts. It lives in
+packages/contracts/src/tier-params.ts as `ltvBps`, in basis points:
+
+| Tier | ltvBps | as a percent |
+|---|---|---|
+| Safe | 4231 | 42.31 |
+| Conservative | 4857 | 48.57 |
+| Balanced | 5467 | 54.67 |
+| Optimistic | 6121 | 61.21 |
+
+An earlier version of this page showed 50, 52, 54, 56 and credited tier-meta.ts.
+Both the numbers and the source were wrong.
 
 Shared market constants: `MAX_LTV_PCT = 90`, `LIQUIDATION_LTV_PCT = 93`
 (tier-meta.ts:101-102). LST is jitoSOL and lending is Kamino Lend on all tiers.
