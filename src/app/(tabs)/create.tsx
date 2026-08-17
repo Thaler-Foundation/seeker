@@ -10,7 +10,8 @@ import { useAuth } from '@/lib/auth';
 import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
 import { TermsModal } from '@/components/terms-modal';
 
-const FIXED_SOL = 2;
+// Safe tier minimum from TIER_PARAMS.
+const FIXED_SOL = 6;
 const EQUITY_LAMPORTS = String(FIXED_SOL * 1_000_000_000);
 const RESERVE_SOL = 0.06;
 
@@ -157,7 +158,7 @@ export default function Create() {
                 </View>
                 <Text style={styles.amount}>{FIXED_SOL}</Text>
               </View>
-              <Text style={styles.mutedSm}>Fixed at 2 SOL · Private Beta</Text>
+              <Text style={styles.mutedSm}>Safe tier accepts 6 to 1111 SOL</Text>
             </View>
             <Text style={styles.eyebrow}>WHERE YOUR SOL GOES</Text>
             <Text style={styles.prose}>
@@ -169,7 +170,7 @@ export default function Create() {
               <MiniRow label="Projected APR (net)" value="8.2% to 13.8%" tone={brand.success} />
               <MiniRow
                 label="Projected Earnings (annual)"
-                value={preview.isLoading && authenticated ? '...' : '+0.16 to 0.28 SOL'}
+                value={preview.isLoading && authenticated ? '...' : '+0.49 to 0.83 SOL'}
                 tone={brand.success}
               />
               <MiniRow label="Service Fee" value="11% (on yield)" />
@@ -194,27 +195,72 @@ export default function Create() {
 
         {stage === 'fund' ? (
           <View style={styles.panel}>
-            <Text style={styles.eyebrow}>STEP 2 . FUND YOUR WALLET</Text>
-            <Text style={styles.mutedSm}>Your Thaler wallet address</Text>
-            <Text style={styles.mono}>{balance.data?.address ?? '...'}</Text>
-            <View style={styles.miniRows}>
-              <MiniRow label="Required" value={`${(requiredLamports / 1e9).toFixed(2)} SOL`} />
-              <MiniRow
-                label="Current balance"
-                value={`${(currentLamports / 1e9).toFixed(2)} SOL`}
-              />
-            </View>
-            <View style={styles.track}>
-              <View
-                style={[
-                  styles.fill,
-                  { width: `${Math.min(100, (currentLamports / requiredLamports) * 100)}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.mutedSm}>
-              {funded ? 'Funded - ready to open' : 'Waiting for funds. Checking every 5s.'}
-            </Text>
+            {funded ? (
+              <>
+                <Text style={styles.panelTitle}>Ready to open your vault</Text>
+                <Text style={styles.mutedSm}>
+                  Your wallet has enough SOL. Review the breakdown below before proceeding.
+                </Text>
+                <Text style={styles.eyebrow}>ON VAULT OPEN</Text>
+                <View style={styles.miniRows}>
+                  <MiniRow
+                    label="Thaler Wallet Balance"
+                    value={`${(currentLamports / 1e9).toFixed(4)} SOL`}
+                  />
+                  <MiniRow label="Deployed to strategy" value={`${FIXED_SOL.toFixed(2)} SOL`} />
+                  <MiniRow
+                    label="Fee reserve (one-time)"
+                    value={`${RESERVE_SOL.toFixed(2)} SOL`}
+                  />
+                  {currentLamports > requiredLamports ? (
+                    <MiniRow
+                      label="Stays in your Thaler wallet"
+                      value={`~${((currentLamports - requiredLamports) / 1e9).toFixed(4)} SOL`}
+                    />
+                  ) : null}
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.panelTitle}>Fund Your Vault Wallet</Text>
+                <Text style={styles.mutedSm}>
+                  Each vault gets its own dedicated wallet, not a shared pool. Your worker manages
+                  this wallet exclusively on your behalf.
+                </Text>
+                <Text style={styles.eyebrow}>SEND EXACTLY</Text>
+                <Text style={styles.amount}>{`${(requiredLamports / 1e9).toFixed(2)} SOL`}</Text>
+                <View style={styles.miniRows}>
+                  <MiniRow label="Vault equity" value={`${FIXED_SOL.toFixed(2)} SOL`} />
+                  <MiniRow
+                    label="Fee reserve (network + setup)"
+                    value={`${RESERVE_SOL.toFixed(2)} SOL`}
+                  />
+                </View>
+                <Text style={styles.mutedSm}>Send to your Thaler wallet</Text>
+                <Text style={styles.mono}>{balance.data?.address ?? '...'}</Text>
+                <View style={styles.miniRows}>
+                  <MiniRow
+                    label="Balance received"
+                    value={`${(currentLamports / 1e9).toFixed(2)} / ${(
+                      requiredLamports / 1e9
+                    ).toFixed(2)} SOL`}
+                  />
+                </View>
+                <View style={styles.track}>
+                  <View
+                    style={[
+                      styles.fill,
+                      { width: `${Math.min(100, (currentLamports / requiredLamports) * 100)}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.mutedSm}>
+                  {`Waiting for funds. The Open Vault button unlocks once your balance reaches ${(
+                    requiredLamports / 1e9
+                  ).toFixed(2)} SOL`}
+                </Text>
+              </>
+            )}
             <Pressable
               accessibilityRole="button"
               disabled={!funded || openVault.isPending}
@@ -242,7 +288,7 @@ export default function Create() {
 
         {stage === 'open' ? (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Building your vault.</Text>
+            <Text style={styles.panelTitle}>Creating your vault</Text>
             <Text style={styles.mutedSm}>{`${doneCount} of ${totalSteps} steps complete`}</Text>
             <View style={styles.steps}>
               {(openState.data?.steps ?? pendingSteps).map((s) => (

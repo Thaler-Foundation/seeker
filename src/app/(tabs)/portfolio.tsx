@@ -222,7 +222,7 @@ export default function Portfolio() {
     },
     { label: 'Claimable Yield', value: money(claimableNet), tone: brand.success },
     { label: 'Active Vaults', value: String(rows.length) },
-    { label: 'ROI', value: `${portfolioRoi.toFixed(2)}%`, tone: brand.success },
+    { label: 'Return Rate', value: `${portfolioRoi.toFixed(2)}%`, tone: brand.success },
   ];
 
   return (

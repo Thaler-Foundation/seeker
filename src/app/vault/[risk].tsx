@@ -21,9 +21,9 @@ const TIER_META = {
   safe: { mode: 'A', label: 'Safe', color: '#99BBFF', riskLabel: 'Low', perpVenue: 'Pacifica', lst: 'jitoSOL' },
   conservative: { mode: 'B', label: 'Conservative', color: '#99FFDD', riskLabel: 'Low', perpVenue: 'Pacifica', lst: 'jitoSOL' },
   balanced: { mode: 'C', label: 'Balanced', color: '#BBFF99', riskLabel: 'Medium', perpVenue: 'Pacifica', lst: 'jitoSOL' },
-  optimistic: { mode: 'D', label: 'Optimistic', color: '#FFDD99', riskLabel: 'Medium', perpVenue: 'Hyperliquid', lst: 'jitoSOL' },
-  aggressive: { mode: 'E', label: 'Aggressive', color: '#FF99BB', riskLabel: 'High', perpVenue: 'Hyperliquid', lst: 'jitoSOL' },
-  yolo: { mode: 'F', label: 'YOLO', color: '#DD99FF', riskLabel: 'High', perpVenue: 'Hyperliquid', lst: 'jitoSOL' },
+  optimistic: { mode: 'D', label: 'Optimistic', color: '#FFDD99', riskLabel: 'Medium', perpVenue: 'Pacifica', lst: 'jitoSOL' },
+  aggressive: { mode: 'E', label: 'Aggressive', color: '#FF99BB', riskLabel: 'High', perpVenue: 'Pacifica', lst: 'jitoSOL' },
+  yolo: { mode: 'F', label: 'YOLO', color: '#DD99FF', riskLabel: 'High', perpVenue: 'Pacifica', lst: 'jitoSOL' },
 } as const;
 type Tier = keyof typeof TIER_META;
 
@@ -37,18 +37,15 @@ const APY_RANGE: Record<Tier, { min: number; max: number }> = {
 };
 
 const STRATEGY_DESC: Record<Tier, string> = {
-  safe:
-    'Built for capital preservation, with returns that do not depend on which way SOL moves. Your deposit is staked as jitoSOL, posted as Kamino collateral, and partially borrowed back to fund a short perpetual hedge that cancels out price exposure while you earn staking, lending, funding, and LP fees. The vault is your own Squads Smart Account, run by a dedicated Cloudflare worker that can only act within the immutable policy you signed at vault creation.',
-  conservative:
-    'A small step up from Safe for users who want a touch more yield with the same calm. The strategy leans into the Kamino carry loop so the deposit-borrow spread does more of the work, while the short perpetual hedge stays small and runs at the same low leverage as Safe. Buffers stay wide and the dedicated worker only acts within the immutable Squads policy you signed at the moment your vault was created.',
+  safe: 'Capital preservation with delta-neutral yield. Staked SOL earns while hedged with a perp short.',
+  conservative: 'A slightly larger hedge than Safe. Adds to the funding income, same leverage.',
   balanced:
-    'For users who want noticeably more yield than the conservative tiers without taking heavy market exposure. Capital splits roughly evenly between the Kamino carry loop and the short perpetual hedge, with the hedge running at moderate leverage so funding income contributes alongside the unleveraged carry. The Squads policy is locked on-chain from the moment you sign it, immutable from that point forward and open for you to inspect at any time.',
+    'An even mix of loops and hedge. Moderate funding income joins the staking and lending yield.',
   optimistic:
-    'For users comfortable trading a thinner margin of safety for noticeably higher yield. More capital sits on the hedged side, with the short perpetual hedge running at higher leverage than Balanced so funding income becomes a leading contributor alongside the unleveraged carry loop. Even at this leverage, the immutable policy still defines exactly what the worker can or cannot do.',
+    'Hedge focused for stronger funding capture. A bigger short with the carry loop still underneath.',
   aggressive:
-    'For users who want most of their yield to come from funding rather than the carry. The short perpetual hedge runs at substantial leverage to dominate the yield mix when funding is positive, while the Kamino carry loop continues as a steady unleveraged base with tighter buffers and faster rebalances. Even these moves stay bounded by the immutable rules you signed at the moment of vault creation.',
-  yolo:
-    'The highest-yielding profile Thaler runs, for users who want to push the strategy as hard as Thaler allows. The short perpetual hedge runs at the maximum leverage Thaler permits to carry the bulk of the yield whenever funding is favourable, while the Kamino carry loop runs unchanged underneath as a steady base. Volatile by design, but every action stays enforced by the immutable rules you signed when your vault was created.',
+    'Funding yield with a heavy hedge. Larger borrow and short sizes drive faster compounding.',
+  yolo: 'Maximum hedge, full looped collateral shorted. Highest funding capture at the widest risk band.',
 };
 
 const LAMPORTS = 1e9;
@@ -541,9 +538,7 @@ export default function VaultDetail() {
 }
 
 function rowMetrics(v: VaultRow, pos: VaultPositions | undefined, solPriceUsd: number) {
-  const p = pos as unknown as
-    | { equityNavLamports?: string; pendingRecycleUsd?: number | null; realizedYieldLamports?: string | null; daysHeld?: number }
-    | undefined;
+  const p = pos;
   const baseNetValueSol = p?.equityNavLamports
     ? Number(p.equityNavLamports) / LAMPORTS
     : Number(v.equityLamports) / LAMPORTS;
@@ -564,7 +559,7 @@ function rowMetrics(v: VaultRow, pos: VaultPositions | undefined, solPriceUsd: n
 type SortKey = 'netValue' | 'roi' | 'yield' | 'ltv';
 const VAULT_COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'netValue', label: 'NET VALUE' },
-  { key: 'roi', label: 'ROI' },
+  { key: 'roi', label: 'RETURN RATE' },
   { key: 'yield', label: 'YIELD' },
   { key: 'ltv', label: 'LTV' },
 ];
@@ -680,10 +675,10 @@ function PendingVaultCard({
     mutationFn: async () =>
       fetchThaler(await getToken(), endpoints.vaultDismantle(vault.id), { method: 'POST' }),
     onSuccess: () => {
-      setNote('Unwind started');
+      setNote('Close started');
       onChanged();
     },
-    onError: (e) => setNote(e instanceof Error ? e.message : 'Could not start unwind'),
+    onError: (e) => setNote(e instanceof Error ? e.message : 'Could not start close'),
   });
   return (
     <View style={s.card}>
@@ -711,7 +706,7 @@ function PendingVaultCard({
             onPress={() => dismantle.mutate()}
             style={[s.btnDestructive, dismantle.isPending && { opacity: 0.6 }]}
           >
-            <Text style={s.btnDestructiveLabel}>{dismantle.isPending ? 'Unwinding…' : 'Unwind'}</Text>
+            <Text style={s.btnDestructiveLabel}>{dismantle.isPending ? 'Closing…' : 'Close vault'}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -745,27 +740,7 @@ function PositionDetail({
   getToken: () => Promise<string | null>;
   onBack: () => void;
 }) {
-  const p = pos as unknown as
-    | {
-        pendingRecycleUsd?: number | null;
-        realizedYieldLamports?: string | null;
-        daysHeld?: number;
-        apyBps?: number;
-        yieldHistorySol?: { ts: number; earnedSol: number }[];
-        claimPreview?: {
-          fundingReceivedSol?: { sol: string };
-          fundingPaidSol?: { sol: string };
-          scalpProfitsSol?: { sol: string };
-          preScalpProfitsSol?: { sol: string };
-          grossClaimableLamports?: string;
-          serviceFeeBps?: number;
-          netUserYieldLamports?: string;
-          releasableNowNetLamports?: string;
-          carryAutocompoundedSol?: { sol: string };
-          lpFeesAutocompoundedSol?: { sol: string };
-        } | null;
-      }
-    | undefined;
+  const p = pos;
   const [yieldView, setYieldView] = useState<'SOL' | 'USD'>('SOL');
   const earnedSol =
     p?.realizedYieldLamports != null
@@ -822,7 +797,7 @@ function PositionDetail({
             sub={solPrice > 0 ? `≈ $${(earnedSol * solPrice).toFixed(2)}` : undefined}
             tone={earnedSol >= 0 ? brand.success : brand.warning}
           />
-          <BigStat label="ROI" value={`${roi.toFixed(2)}%`} tone={roi >= 0 ? brand.success : brand.warning} />
+          <BigStat label="Return Rate" value={`${roi.toFixed(2)}%`} tone={roi >= 0 ? brand.success : brand.warning} />
           <BigStat label="USDC Earned" value={`${pendingUsdc.toFixed(2)} USDC`} tone={pendingUsdc >= 0 ? brand.success : brand.warning} />
           <BigStat label="Net Value" value={`${netValueSol.toFixed(4)}`} sub="SOL" />
         </View>
@@ -948,9 +923,7 @@ function LiquidationCard({ vault, pos, solPrice }: { vault: VaultRow | null; pos
       </View>
     );
   }
-  const p = pos as unknown as
-    | { equityNavLamports?: string; realizedYieldLamports?: string | null; pendingRecycleUsd?: number | null; apyBps?: number; activeUpsideBorrowCount?: number; positions?: { kaminoMultiply?: { netCarryApyBps?: number } | null } }
-    | undefined;
+  const p = pos;
   const depositSol = Number(vault.equityLamports) / LAMPORTS;
   const realizedSol =
     p?.realizedYieldLamports != null ? Number(p.realizedYieldLamports) / LAMPORTS : 0;
@@ -968,7 +941,7 @@ function LiquidationCard({ vault, pos, solPrice }: { vault: VaultRow | null; pos
     <View style={s.card}>
       <Text style={s.cardTitle}>Your Risk Summary</Text>
       <View style={s.factBlock}>
-        <FactRow label="ROI" value={`${roi.toFixed(2)}%`} valueColor={roi >= 0 ? brand.success : brand.warning} />
+        <FactRow label="Return Rate" value={`${roi.toFixed(2)}%`} valueColor={roi >= 0 ? brand.success : brand.warning} />
         <FactRow label="Net Value" value={`${Number.isFinite(netValueSol) ? netValueSol.toFixed(4) : '0.0000'} SOL`} />
         <FactRow label="Vault Health" value={vaultHealth ?? '-'} valueColor={tone(vaultHealth)} />
         <FactRow label="Short Hedge" value={shortHedge ?? '-'} valueColor={tone(shortHedge)} />

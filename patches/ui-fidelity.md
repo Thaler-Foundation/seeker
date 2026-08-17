@@ -1,5 +1,10 @@
 # UI fidelity spec - verbatim strings and recipes
 
+Read this first. The strings here were captured at main 4e841e0b on
+2026-07-16. Production main is now 8d96a358, 35 web commits later. The All
+Vaults note was re-checked at 8d96a358. Treat every other verbatim string as
+needing a fresh check against the current file before you copy it.
+
 SOURCE PRIORITY (corrected 2026-07-16): 1) Thaler-Foundation/frontend
 (private standalone Next app, the NEWEST UI - /portfolio route replaces
 /vaults which now redirects; og share card 1200x750 full-bleed tier art from
@@ -59,7 +64,9 @@ copy action "Copy wallet address". Balance row asset "Solana", entry
 Verified new copy at main: "Earn from active strategies", "Track performance
 by NAV". Structure per prior verification: h1 "Vaults", TopStats "Total
 deposits" + "30D APY", "Featured" + How-it-works, Featured Safe Vault card
-(LineWaves backdrop, tier #99BBFF), "All Vaults" table with B-F "Coming soon".
+(LineWaves backdrop, tier #99BBFF), "All Vaults" table with all six tiers
+live. The B-F "Coming soon" state is gone; at main 8d96a358 LIVE_TIERS is the
+full TIER_ORDER (dashboard/page.tsx:31) and each row renders its own numbers.
 
 ## Data bindings the visuals must respect (spec-verified)
 

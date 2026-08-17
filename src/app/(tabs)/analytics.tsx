@@ -155,7 +155,7 @@ export default function Analytics() {
       node: k ? <SolUsd sol={totalTvlSol} price={solPrice} /> : undefined,
       value: k ? undefined : '-',
     },
-    { label: 'Protocol ROI', value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-' },
+    { label: 'Protocol Return Rate', value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-' },
     {
       label: 'Yield Generated',
       node: k ? <SolUsd sol={totalYieldGenSol} price={solPrice} /> : undefined,
@@ -217,22 +217,17 @@ export default function Analytics() {
           </Text>
           {breakdown.map((r, i) => {
             const meta = MODE_META[r.mode] ?? MODE_META.A;
-            const live = r.vaultCount > 0;
             return (
-              <View key={r.mode} style={[styles.row, i > 0 && styles.rowBorder, !live && { opacity: 0.45 }]}>
+              <View key={r.mode} style={[styles.row, i > 0 && styles.rowBorder]}>
                 <View style={styles.rowL}>
                   <View style={[styles.dot, { backgroundColor: meta.color }]} />
                   <Text style={styles.rowLabel}>{meta.label}</Text>
                 </View>
-                {live ? (
-                  <Text style={styles.rowValue}>
-                    {`${r.vaultCount}  ${compactSol(num(r.tvlSol))} SOL  ${
-                      r.apy30dMedianBps != null ? (r.apy30dMedianBps / 100).toFixed(1) : '-'
-                    }%`}
-                  </Text>
-                ) : (
-                  <Text style={styles.soon}>Coming soon</Text>
-                )}
+                <Text style={styles.rowValue}>
+                  {`${r.vaultCount}  ${compactSol(num(r.tvlSol))} SOL  ${
+                    r.apy30dMedianBps != null ? (r.apy30dMedianBps / 100).toFixed(1) : '-'
+                  }%`}
+                </Text>
               </View>
             );
           })}

@@ -22,7 +22,7 @@ contract either way.
 | S3.3 Vault rows enrichment | getVaultPositions per id (GET /v1/vaults/sol-jito-kamino/{id}/positions) |
 | S3.4 / S6.1 Activity | listVaults + listModeTriggers (GET /v1/modes/triggers) + listModeScalps (GET /v1/modes/scalps) + getSolPrice (GET /v1/modes/sol-price), rows synthesized client-side |
 | S4.2-4.3 Vault overview | getAnalytics (GET /v1/analytics: tvlByModeDaily, apyByModeDaily, strategyBreakdown) + getPublicApyHistory (GET /public/protocol/apy-history?tier&days) |
-| S4.6 Position detail | getVaultPositions (kaminoMultiply ltvBps, liquidationLtvBps, leverage, healthFactor, daysHeld) |
+| S4.6 Position detail | getVaultPositions (kaminoMultiply ltvBps, liquidationLtvBps, leverage, netCarryApyBps; daysHeld at top level; healthFactor is NOT on kaminoMultiply, read it from kaminoLend[].borrow.healthFactor or VaultSummary.metrics.healthFactor) |
 | S4.8 Claim box | getVaultPositions.claimPreview -> ClaimBreakdown (grossClaimableLamports, netUserYieldLamports, releasableNowGrossLamports, releasableNowNetLamports) |
 | S4.9 Claim action | claimVaultYield (POST /v1/vaults/sol-jito-kamino/{id}/claim) + getVaultClaim (GET, 3s poll) |
 | S4.11 / S5.1 Preview | previewVault (GET /v1/vaults/sol-jito-kamino/preview?equityLamports&tier: finalState.collateralSol/lpTailSol/debtSol/extraBorrowSol, perpPlan.notionalSol) |
