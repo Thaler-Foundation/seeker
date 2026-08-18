@@ -16,9 +16,10 @@ ships inside the app binary.
 
 1. every endpoint the app uses is in src/lib/api.ts, in the `endpoints` object.
    every one maps to a real route under /api on the bff. verified present.
-2. every response type comes from @thaler/contracts (workspace package). keep the
-   screen reads matching those types. when the backend adds a field, it appears
-   here after a contracts build.
+2. every response type lives in src/lib/contracts.ts. it is a copy kept by hand,
+   not an installed package, so nothing updates it on its own. after a backend
+   change, copy the change across by hand. an earlier version of this page said
+   the types come from a workspace package. that was wrong.
 3. every call goes through fetchThaler(token, path). pass the privy token from
    getToken(). the public routes (/api/stats, /api/apy-history) take no token.
 4. do not add x-api-key, bearer secrets, api keys, or wallet keys anywhere in the
@@ -26,27 +27,57 @@ ships inside the app binary.
 
 ## screen parity (what each screen must show, to match the web)
 
-the web replaced per vault apy with roi, and renamed the strategy apy to
-projected apr. sol amounts are primary with a live usd in parentheses. this repo
-is now wired that way. keep it that way.
+the web replaced per vault apy with a realized return figure, and renamed the
+strategy apy to projected apr. every standalone "ROI" label is now "Return
+Rate". two compound labels still say ROI on the web and are not part of the
+rename: "Current ROI" (components/tables/vaults/columns.tsx:412) and "Blended
+ROI" (components/dashboard/portfolio-card.tsx:18). neither has a screen in this
+app. sol amounts are primary with a live usd in parentheses. this repo is now
+wired that way. keep it that way.
 
 1. home: featured card stat is "Projected APR" from /api/stats apy. all vaults
    rows show that same percent plus tvl.
-2. analytics: kpis are Total Value Locked, Protocol ROI, Yield Generated, Active
-   Vaults. tvl and yield are sol primary with a live usd in parentheses, summed
-   from strategyBreakdown tvlSol and lifetimeYieldSol. the price is /api/stats
-   solPriceUsd, falling back to sum(tvlUsd)/sum(tvlSol). protocol roi is
-   kpis.roiPct. the per mode row shows count, tvlSol, and apy30dMedianBps as the
-   projected apr percent.
+2. analytics: kpis are Total Value Locked, Protocol Return Rate, Yield Generated,
+   Active Vaults. tvl and yield are sol primary with a live usd in parentheses,
+   summed from strategyBreakdown tvlSol and lifetimeYieldSol. the price is
+   /api/stats solPriceUsd, falling back to sum(tvlUsd)/sum(tvlSol). the protocol
+   return rate is kpis.roiPct. the per mode row shows count, tvlSol, and
+   apy30dMedianBps as the projected apr percent.
 3. portfolio: kpis are Net Value, Yield Earned, Claimable Yield, Active Vaults,
-   ROI. roi is sum(realized yield)/sum(deposit) times 100, where deposit is the
-   vaults list equityLamports joined by id. each vault row shows net value, roi,
-   yield, ltv.
+   Return Rate. that rate is sum(realized yield)/sum(deposit) times 100, where
+   deposit is the vaults list equityLamports joined by id. each vault row shows
+   net value, return rate, yield, ltv.
 4. vault detail: overview stat and advanced factrow are "Projected APR". the
    backtest stat is "Avg. Projected APR". the position stat and the risk summary
-   show "ROI" (realized yield over deposit). the per tier table column is "ROI".
-5. create: the preview row is "Projected APR (net)". the range value is still a
-   placeholder; wire it to /api/thaler/vaults/preview to make it live.
+   show "Return Rate" (realized yield over deposit). the per tier table column is
+   "RETURN RATE", uppercase to match the other column headers in that table.
+5. create: the preview rows are "Projected APR (net)" and "Projected Earnings
+   (annual)", matching CreateVaultPanel in vault/[risk]/page.tsx:2274-2276,
+   which is what this screen mirrors. do not copy the labels from
+   components/create-vault/deposit-form.tsx; that is a different component and
+   it says "Projected APR (SOL)". the range values are still placeholders; wire
+   them to /api/thaler/vaults/preview to make them live.
+
+## deposit bounds, read this before touching the create screen
+
+the api rejects any deposit outside the per tier range. the rule lives in
+packages/contracts/src/vaults.ts (openVaultSchema superRefine) and is enforced
+again in the route at apps/api/src/transport/http/routes/sol-vaults.ts. the
+error reads "deposit for tier X must be between MIN and MAX SOL".
+
+| tier | min SOL | max SOL |
+|---|---|---|
+| safe | 6 | 1111 |
+| conservative | 6 | 1111 |
+| balanced | 8 | 1111 |
+| optimistic | 11 | 1112 |
+| aggressive | 9 | 1111 |
+| yolo | 8 | 1111 |
+
+this repo used to post a hardcoded 2 SOL on the safe tier, which is under the
+6 SOL floor, so every open was rejected. the create screen now picks any of the
+six tiers and takes a typed amount, checked against this table before the open
+button unlocks.
 
 ## env (put real values in a local .env file, never commit them)
 
@@ -92,6 +123,43 @@ is now wired that way. keep it that way.
    is created. keep the agreement text in sync if the web copy changes.
 5. after the vault build finishes the create screen now routes to the portfolio
    tab, the same as the web.
+6. done. the create screen now has a risk profile picker for all six tiers and a
+   typed amount. picking a tier resets the amount to that tier's minimum, the
+   same as the web panel. the amount is checked against the per tier table
+   before the button unlocks, and the selected tier and amount are what get
+   posted. the helpers live in src/lib/contracts.ts as TIER_DEPOSIT_BOUNDS,
+   minDepositSol, maxDepositSol and isDepositWithinBounds, mirroring
+   apps/web/src/lib/vaults/mode-a.ts.
+7. the web has no resume button left; its useResumeVault hook is exported but no
+   screen calls it. this app still shows Retry next to Close vault on a failed
+   build. decide whether to keep it before release. the POST /resume route is
+   still live, so keeping it works.
+8. the claim breakdown is missing four rows the web shows in
+   components/vaults/claim-yield-form.tsx: "LP Rewards (JTO) to swap",
+   "Net Carry APR", "Equity", and the "Claim locked" state. the vault page also
+   shows a "Close locked" state. the fields for these are already in the
+   VaultPositions type (claimPreview.lpRewardsSol, claimNextAllowedAtMs,
+   closeUnlockAtMs), so it is wiring, not new contract work.
+9. the web has a pending-automatic-close card
+   (components/vaults/pending-automatic-close.tsx: "Automatic close pending",
+   "AUTOMATIC", "CLOSE PENDING"). this app has no equivalent.
+10. GET /api/thaler/modes/repays is a new bff route (limit, walletId params).
+    it is not in the endpoints object yet. add it if the activity view should
+    show repay events.
+11. the wallet activity list only synthesizes three event types (Open Vault,
+    Claim Yield, Close Vault). the web transformer
+    (lib/activity/transformer.ts) also produces Deposit, Withdraw, Harvest,
+    Rebalance, Scalp, Upside Borrow and Downside Repayment.
+12. the vault page is missing three rows the web position panel shows
+    (components/vaults/vault-position-panel.tsx): "Funding net",
+    "LP incentives APR", "LP swap-fee APR".
+13. there is no operator screen. api-map.md maps S7.6 to the operator and quant
+    endpoints, and the web operator dashboard carries about 63 labels this app
+    has no home for. it is a design surface that was never built here, not
+    drift. build it or drop S7.6 from the map.
+14. the login and about content does not carry the web blog or roadmap entries
+    (data/blog.ts "Weekly Update", "Week 2 at Thaler", "Week 3 at Thaler";
+    data/roadmap.ts "Opening Private Beta (mainnet)").
 
 ## notes
 

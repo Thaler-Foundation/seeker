@@ -1,4 +1,7 @@
 # Icon SVG sources (extracted from lucide-react in-repo + thaler-mark.tsx)
+Note: these 28 paths are the source for building the icons. The app currently
+draws 3 of them inline (the thaler mark and a back arrow) with react-native-svg.
+The rest still need building.
 
 Stroke icons: wrap inner in svg width/height 24, viewBox 0 0 24 24, fill none,
 stroke currentColor, stroke-width 2, round caps/joins. Import via

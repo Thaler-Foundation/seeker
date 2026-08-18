@@ -1,5 +1,11 @@
 # Production UI truth (graph + grep extraction, 2026-07-16)
 
+Read this first. This file was captured at main 4e841e0b on 2026-07-16.
+Production main is now 8d96a358, which is 35 web commits and 82 changed files
+later. The create box, the analytics KPI cells and the strategy breakdown were
+re-checked at 8d96a358 and are marked inline. Every other string here still
+reflects 4e841e0b, so confirm against the current file before building from it.
+
 Sources of truth per the user's ruling:
 - Thaler-Finance apps/web protected routes at main 4e841e0b (live on Vercel)
 - Thaler-Foundation/frontend upgrades (clone: scratchpad/tf-frontend-full), notably /portfolio
@@ -18,13 +24,17 @@ Deposit row usage: `size-7` (:1958). History cell usage in frontend portfolio: `
   text-[11px], bg = `${meta.color}1f` (12% tint), text = meta.color, label = meta.label
   ("Safe", #99BBFF for tier safe per tier-meta.ts:18-24).
 - Deposit box (muted/30, border/60, rounded-xl, p-5):
-  row1 "You deposit" | "~$424.80" (usd = 2 x live solPriceUsd)
-  row2 SolToken size-7 + "SOL" (text-lg semibold) | "2" (text-3xl semibold tabular)
-  row3 "Fixed at 2 SOL · Private Beta" (MIDDLE DOT, not period)
+  row1 "You deposit" | usd = amount x live solPriceUsd
+  row2 SolToken size-7 + "SOL" (text-lg semibold) | typed amount (text-3xl
+  semibold tabular)
+  row3 STALE at 8d96a358: the old "Fixed at 2 SOL · Private Beta" line is gone.
+  the web takes a typed amount with per tier bounds (safe 6 to 1111 SOL).
 - "WHERE YOUR SOL GOES" eyebrow, then the jitoSOL/Kamino/Pacifica paragraph.
-- FactRows: "Target APY (net)" green range, "Projected Earnings (annual)" green,
-  "Service Fee" = "11% (on yield)", "Vault Creation Fee" = "0.06 SOL reserve".
-- CTA "Deposit 2 SOL" bg-foreground text-background; pending "Preparing…".
+- FactRows: "Projected APR (SOL)" green range, "Projected Earnings (SOL,
+  annual)" green, "Service Fee" = "11% (on yield)", "Vault Creation Fee" =
+  "0.06 SOL reserve". the first two used to read "Target APY (net)" and
+  "Projected Earnings (annual)".
+- CTA bg-foreground text-background; pending "Preparing…".
 - Fund stage CTA "Open vault", pending "Opening…", secondary "Back".
 
 ### MyVaultsTab (:1140-1268)
@@ -117,8 +127,10 @@ Route: (protected)/portfolio/page.tsx. Supersedes the /vaults listing.
 - dashboard/page.tsx: TopStat (:373), FeaturedStat (:382), modeApyText (:167);
   featured 30D APY = single pooled %, Deposited in SOL (tvlSol).
 - analytics/page.tsx: h1 "Analytics", subtitle "Across all Thaler vaults. Every figure
-  aggregates positions opened by every user on the protocol.", 4 KPI cells,
-  strategy breakdown, "Coming soon" for empty tiers.
+  aggregates positions opened by every user on the protocol.", 4 KPI cells
+  (Total Value Locked, Protocol Return Rate, Yield Generated, Active Vaults),
+  strategy breakdown. at 8d96a358 every mode row renders its real numbers,
+  including a zero count; the "Coming soon" state for empty tiers is gone.
 - Login: waves hero + "Earn yield from market movement" title only.
 - No Activity log tab, no Settings page anywhere in production IA.
 - Scalp discriminator: eventType === 'SCALP' (transformer.ts:162).
@@ -146,7 +158,7 @@ Route: (protected)/portfolio/page.tsx. Supersedes the /vaults listing.
     Earned (12.48 USDC green) / Net APY with ORIGINAL case, FactRows 83:702
     (SOL Managed 2 SOL, Days Held 34.0). DONE.
 11. Wiring patch em-dash lines: verified byte-identical copies of Finance
-    production files (only @thaler/sdk -> @/lib/sdk import swaps differ), so
+    production files (only the import swaps differ; the types now live in src/lib/contracts.ts), so
     they are production comments, kept verbatim; commit message and pr-body.md
     verified clean. No patch change.
 12. Seeker src header comments shrunk to one line each, 11 files. DONE.

@@ -1,5 +1,10 @@
 # Full UI map - Thaler Seeker
 
+Read this first. This map was verified at main 4e841e0b on 2026-07-16.
+Production main is now 8d96a358, 35 web commits later. The /dashboard and
+/analytics rows and the Analytics KPI section were re-checked at 8d96a358.
+Everything else still reflects 4e841e0b, so confirm before building from it.
+
 ## Repo divergence verdict (verified 2026-07-16, second remap)
 
 Thaler-Foundation/frontend (private, standalone, pushed 07-15 10:23 UTC) and
@@ -54,11 +59,11 @@ Wavy backdrop recipe (HeroSection.tsx:82-101, exact):
 |---|---|---|
 | / landing (Hero, SplitFeature, PaymentRails, StrategyShowcase, Roadmap, FAQ, Blog, FinalCTA) | LIVE | Login screen (hero) + About sheet (rest) |
 | /auth/sign-in (Privy email gate; errors: "Verification failed. Please try again.", "This account is not on the Thaler beta list.") | LIVE | Login flow states |
-| /dashboard ("Vaults" grid; TopStats Total deposits + 30D APY; Featured Safe card w/ LineWaves; All Vaults table B-F "Coming soon"; copy "Earn from active strategies", "Track performance by NAV") | LIVE | Home tab |
+| /dashboard ("Vaults" grid; TopStats Total deposits + 30D APY; Featured Safe card w/ LineWaves; All Vaults table with all six tiers live, each row its own Projected APR + Total Deposits; copy "Earn from active strategies", "Track performance by NAV") | LIVE | Home tab |
 | /vaults Portfolio (5 KPIs incl. Median APY; Net Value chart; tabs Vaults / Transaction History; columns Vault, Net Value, PnL, Net APY) | LIVE | Portfolio tab |
 | /vault/[risk] (tabs Overview / My Vaults / Info & FAQs; Overview pills Vault Info / Advanced Info / Backtesting; sticky DepositPanel; TermsModal; VaultFundingGate; VaultOpenProgressModal; ClaimYieldForm 14 rows; position detail Net Value / Net APY) | LIVE, hosts the whole create flow | Vault detail + Create tab source |
 | /strategies + /strategies/simulate | LIVE (static/mock) | Strategies screen + simulator |
-| /analytics (KPI cells: Total Value Locked, Protocol APY (net), Yield Generated, Active Vaults; TVL stacked chart 1W/1M/3M; APY by tier; allocations; strategy breakdown; OperatorDashboard admin) | LIVE | Analytics tab section + operator (admin) |
+| /analytics (KPI cells: Total Value Locked, Protocol Return Rate, Yield Generated, Active Vaults; TVL stacked chart 1W/1M/3M; APY by tier; allocations; strategy breakdown; OperatorDashboard admin) | LIVE | Analytics tab section + operator (admin) |
 | /activity (pills All / Deposit / Withdraw / Harvest / Rebalance; table Category, Interaction, Detail, Strategy, Amount, Asset, Time, Status) | LIVE | Activity tab |
 | Wallet drawer (Balances / Positions / Activity; Withdraw; Export wallet key) | LIVE (header) | Wallet bottom sheet |
 | /blog, /terms, /privacy-policy | LIVE static | About/legal sheets |
@@ -77,10 +82,11 @@ though the web UI is unmounted.
 
 ## Analytics KPI correction (supersedes older notes)
 
-At main the hero strip is 4 cells: "Total Value Locked",
-"Protocol APY (net)", "Yield Generated", "Active Vaults"
-(analytics-hero.tsx:334-352). Timeframes 1W / 1M / 3M. Tier legend Safe
-through YOLO with B-F dimmed.
+At main 8d96a358 the hero strip is 4 cells: "Total Value Locked",
+"Protocol Return Rate", "Yield Generated", "Active Vaults"
+(analytics-hero.tsx:360, 366, 372, 378). Timeframes 1W / 1M / 3M. The second
+cell used to read "Protocol APY (net)" and the cells used to sit at 334-352;
+both changed, so do not trust the older numbers.
 
 ## Data contract
 

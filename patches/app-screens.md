@@ -1,8 +1,13 @@
 # Thaler Seeker - screen map (as built)
 
 Every screen in src/app, its production counterpart, and its data sources.
-Production references are file:line in Thaler-Finance apps/web at main
-4e841e0b unless marked frontend (Thaler-Foundation/frontend).
+
+Read this first. The file:line references below were captured at main 4e841e0b
+on 2026-07-16. Production main is now 8d96a358, which is 35 web commits and
+82 changed files later, so line numbers will have moved and some behaviour has
+changed. The Home, Create and Analytics entries were re-verified at 8d96a358
+and say so inline. Everything else still reflects 4e841e0b, so confirm against
+the current file before you build from it.
 
 ## Login - src/app/index.tsx
 
@@ -18,9 +23,13 @@ Production: landing hero + sign-in-form.tsx.
 Production: dashboard/page.tsx.
 - Header: "Vaults" h1, SOL Price TopStat, Wallet pill -> /wallet
 - FEATURED + "How it works"; featured card (THALER ONE / Safe Vault) with
-  30D APY (single pooled %, toThirtyDayApy) and Deposited (tvlSol)
-- ALL VAULTS: 6 tier rows, only Safe live, rest "Coming soon"
-- Data: GET /api/stats (public). Featured card + live rows push /vault/{tier}
+  Projected APR and Total Deposits (tvlSol)
+- ALL VAULTS: 6 tier rows, all six live and pressable. each row shows its own
+  Projected APR (latest apyByModeDaily point for that mode) and its own
+  deposits (strategyBreakdown tvlSol for that mode), the same per tier sources
+  the web dashboard uses. re-verified at main 8d96a358.
+- Data: GET /api/stats (public) + GET /api/thaler/analytics. Every row pushes
+  /vault/{tier}
 
 ## Portfolio - src/app/(tabs)/portfolio.tsx
 
@@ -43,10 +52,14 @@ Production: frontend /portfolio page (the upgrade layer).
 ## Create - src/app/(tabs)/create.tsx
 
 Production: DepositPanel (vault/[risk]/page.tsx:1934-2010).
-- Stages configure -> fund -> open; fixed 2 SOL; "Fixed at 2 SOL · Private Beta"
-- "You deposit" ~$ = 2 x live SOL price; WHERE YOUR SOL GOES paragraph;
-  Target APY (net), Projected Earnings (annual), Service Fee "11% (on yield)",
-  Vault Creation Fee "0.06 SOL reserve"
+- Stages configure -> fund -> open. the web now takes a typed amount and a tier
+  pick, with per tier bounds (safe 6 to 1111 SOL). the "Fixed at 2 SOL ·
+  Private Beta" line is gone from the web and from this app. re-verified at
+  main 8d96a358.
+- "You deposit" ~$ = amount x live SOL price; WHERE YOUR SOL GOES paragraph;
+  Projected APR (net), Projected Earnings (annual), Service Fee
+  "11% (on yield)", Vault Creation Fee "0.06 SOL reserve"
+  (CreateVaultPanel, vault/[risk]/page.tsx:2274-2280, re-verified at 8d96a358)
 - Open progress: 8 production step labels
 - Data/mutations: vault-wallets provisioning, dual-wallet balance, vault open
   execution + state polling, /api/stats
@@ -55,10 +68,11 @@ Production: DepositPanel (vault/[risk]/page.tsx:1934-2010).
 
 Production: analytics page + analytics-hero.tsx.
 - "Analytics" h1 + verbatim subtitle ("Across all Thaler vaults. ...")
-- 4 KPI cells: Total Value Locked, Protocol APY (net), Yield Generated,
+- 4 KPI cells: Total Value Locked, Protocol Return Rate, Yield Generated,
   Active Vaults
-- STRATEGY BREAKDOWN rows per mode (dot, label, count/tvl/APY), "Coming soon"
-  for empty tiers
+- STRATEGY BREAKDOWN rows per mode (dot, label, count/tvl/APY). every mode
+  renders its real numbers, including a zero count. the web has no "Coming
+  soon" state here. re-verified at main 8d96a358.
 - Data: GET /api/thaler/analytics
 
 ## Vault detail - src/app/vault/[risk].tsx

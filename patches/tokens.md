@@ -32,20 +32,36 @@ Dark is the default theme (next-themes `defaultTheme='dark'`, no system).
 Status runtime vars: `--thaler-positive #10b981`, `--thaler-negative #ef4444`,
 `--thaler-warning #f59e0b` (identical both themes).
 
-## Strategy tier palette (tier-meta.ts:17-96, the single source of truth)
+## Strategy tier palette (apps/web/src/lib/vaults/tier-meta.ts)
 
-| Tier | Mode | Hex | Risk | LTV % | Multiply | Perp lev | Health | Venue |
-|---|---|---|---|---|---|---|---|---|
-| Safe | A | `#99BBFF` | Low | 50 | 1.2x | 5x | 1.85 | Pacifica |
-| Conservative | B | `#99FFDD` | Low | 52 | 1.3x | 5x | 1.65 | Pacifica |
-| Balanced | C | `#BBFF99` | Medium | 54 | 1.4x | 6x | 1.45 | Pacifica |
-| Optimistic | D | `#FFDD99` | Medium | 56 | 1.5x | 6x | 1.35 | Hyperliquid |
-| Aggressive | E | `#FF99BB` | High | 58 | 1.6x | 6.9x | 1.28 | Hyperliquid |
-| YOLO | F | `#DD99FF` | High | 60 | 1.8x | 7.5x | 1.18 | Hyperliquid |
+These seven fields are the ones screens actually read: mode, label, color,
+riskLabel, perpVenue, lst, lending.
+
+| Tier | Mode | Hex | Risk | Venue | LST | Lending |
+|---|---|---|---|---|---|---|
+| Safe | A | `#99BBFF` | Low | Pacifica | jitoSOL | Kamino Lend |
+| Conservative | B | `#99FFDD` | Low | Pacifica | jitoSOL | Kamino Lend |
+| Balanced | C | `#BBFF99` | Medium | Pacifica | jitoSOL | Kamino Lend |
+| Optimistic | D | `#FFDD99` | Medium | Pacifica | jitoSOL | Kamino Lend |
+| Aggressive | E | `#FF99BB` | High | Pacifica | jitoSOL | Kamino Lend |
+| YOLO | F | `#DD99FF` | High | Pacifica | jitoSOL | Kamino Lend |
+
+Venue is Pacifica on all six tiers (tier-meta.ts:44, 53, 62, 71, 80, 89). An
+earlier version of this page listed Hyperliquid for Optimistic, Aggressive and
+YOLO. That was wrong.
+
+Do not build a mobile surface around leverage or health factor. The file also
+derives `ltvPct`, `multiplyLeverageX`, `perpLeverageX` and `projectedHealth`
+from TIER_PARAMS (tier-meta.ts:97-107), but no screen reads any of them, so the
+web app never shows a per tier leverage or health number. An earlier version of
+this page published all four as if they were on screen, with stale values.
+
+Per vault LTV is shown, on the portfolio row and the vault page. It comes live
+from the API vault row (`ltvBps`), not from tier-meta.ts.
 
 Shared market constants: `MAX_LTV_PCT = 90`, `LIQUIDATION_LTV_PCT = 93`
-(tier-meta.ts:101-102). LST is jitoSOL and lending is Kamino Lend on all tiers.
-Only Safe ships today; B-F render locked ("Soon").
+(tier-meta.ts:21-22). All six tiers are live; an earlier version of this page
+said only Safe shipped and B-F rendered locked, which is no longer true.
 
 ## Capital-flow / bar colors (deposit-form projected position)
 

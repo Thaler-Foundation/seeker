@@ -9,12 +9,12 @@ import { useAuth } from '@/lib/auth';
 import { dark, tier, radius, spacing, brand } from '@/theme/tokens';
 
 const TIERS = [
-  { key: 'safe', label: 'Safe', color: tier.safe, live: true },
-  { key: 'conservative', label: 'Conservative', color: tier.conservative, live: false },
-  { key: 'balanced', label: 'Balanced', color: tier.balanced, live: false },
-  { key: 'optimistic', label: 'Optimistic', color: tier.optimistic, live: false },
-  { key: 'aggressive', label: 'Aggressive', color: tier.aggressive, live: false },
-  { key: 'yolo', label: 'YOLO', color: tier.yolo, live: false },
+  { key: 'safe', label: 'Safe', color: tier.safe, mode: 'A' },
+  { key: 'conservative', label: 'Conservative', color: tier.conservative, mode: 'B' },
+  { key: 'balanced', label: 'Balanced', color: tier.balanced, mode: 'C' },
+  { key: 'optimistic', label: 'Optimistic', color: tier.optimistic, mode: 'D' },
+  { key: 'aggressive', label: 'Aggressive', color: tier.aggressive, mode: 'E' },
+  { key: 'yolo', label: 'YOLO', color: tier.yolo, mode: 'F' },
 ] as const;
 
 function toThirtyDayApy(annualPct: number): number {
@@ -42,18 +42,29 @@ export default function Home() {
   const analytics = useQuery({
     queryKey: ['analytics'],
     queryFn: async () =>
-      fetchThaler<{ apyByModeDaily?: { date: string; mode: string; apyBps: number }[] }>(
-        await getToken(),
-        endpoints.analytics
-      ),
+      fetchThaler<{
+        apyByModeDaily?: { date: string; mode: string; apyBps: number }[];
+        strategyBreakdown?: { mode: string; tvlUsd: number; tvlSol?: number }[];
+      }>(await getToken(), endpoints.analytics),
     enabled: authenticated,
     staleTime: 60_000,
   });
-  // safe tier projected apr from the daily series, same as the vault and dashboard.
-  const safePts = (analytics.data?.apyByModeDaily ?? [])
-    .filter((p) => p.mode === 'A')
-    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
-  const safeApr = safePts.length ? safePts[safePts.length - 1]!.apyBps / 100 : apy30;
+  // Projected APR per tier = latest point of that mode's daily series.
+  const aprForMode = (mode: string): number | null => {
+    const pts = (analytics.data?.apyByModeDaily ?? [])
+      .filter((p) => p.mode === mode)
+      .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+    const bps = pts.length ? pts[pts.length - 1]!.apyBps : undefined;
+    return typeof bps === 'number' && Number.isFinite(bps) ? bps / 100 : null;
+  };
+  // Deposits per tier = that mode's own SOL tvl from the strategy breakdown.
+  const depositsForMode = (mode: string): number | null => {
+    const row = (analytics.data?.strategyBreakdown ?? []).find((r) => r.mode === mode);
+    if (!row) return null;
+    const sol = row.tvlSol ?? (solPrice > 0 ? row.tvlUsd / solPrice : undefined);
+    return typeof sol === 'number' && Number.isFinite(sol) ? sol : null;
+  };
+  const safeApr = aprForMode('A') ?? apy30;
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -92,7 +103,7 @@ export default function Home() {
           <View style={styles.featStats}>
             <TopStat label="Projected APR" value={`${safeApr.toFixed(2)}%`} tone={brand.success} />
             <TopStat
-              label="Deposited"
+              label="Total Deposits"
               value={tvlSol > 0 ? `${Math.round(tvlSol).toLocaleString()} SOL` : formatTvl(tvl)}
             />
           </View>
@@ -100,26 +111,27 @@ export default function Home() {
 
         <Text style={styles.eyebrow}>ALL VAULTS</Text>
         <View style={styles.list}>
-          {TIERS.map((t, i) => (
-            <Pressable
-              key={t.key}
-              disabled={!t.live}
-              onPress={() => router.push(`/vault/${t.key}`)}
-              style={[styles.row, i > 0 && styles.rowBorder, !t.live && { opacity: 0.5 }]}
-            >
-              <View style={styles.rowLeft}>
-                <View style={[styles.dot, { backgroundColor: t.color }]} />
-                <Text style={styles.rowLabel}>{t.label} Vault</Text>
-              </View>
-              {t.live ? (
+          {TIERS.map((t, i) => {
+            const apr = aprForMode(t.mode);
+            const dep = depositsForMode(t.mode);
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => router.push(`/vault/${t.key}`)}
+                style={[styles.row, i > 0 && styles.rowBorder]}
+              >
+                <View style={styles.rowLeft}>
+                  <View style={[styles.dot, { backgroundColor: t.color }]} />
+                  <Text style={styles.rowLabel}>{t.label} Vault</Text>
+                </View>
                 <Text style={styles.rowValue}>
-                  {`${safeApr.toFixed(2)}%  ${formatTvl(tvl)}`}
+                  {`${apr != null ? `${apr.toFixed(2)}%` : '-'}  ${
+                    dep != null ? `${Math.round(dep).toLocaleString()} SOL` : '-'
+                  }`}
                 </Text>
-              ) : (
-                <Text style={styles.soon}>Coming soon</Text>
-              )}
-            </Pressable>
-          ))}
+              </Pressable>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
