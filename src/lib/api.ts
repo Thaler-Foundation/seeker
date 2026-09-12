@@ -51,7 +51,16 @@ export async function fetchThaler<T>(
     ...(init?.headers as Record<string, string> | undefined),
   };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${bffBaseUrl()}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${bffBaseUrl()}${path}`, { ...init, headers });
+  } catch (err) {
+    throw new ThalerProxyError(
+      0,
+      'network',
+      err instanceof Error ? err.message : 'network error'
+    );
+  }
   if (!res.ok) throw await parseError(res);
   return (await res.json()) as T;
 }
@@ -63,7 +72,7 @@ export type PublicStats = {
   solPriceUsd: number;
   apy: number;
   activeVaultCount: number | null;
-  asOf: number | null;
+  asOf: string | null;
 };
 
 export const endpoints = {
