@@ -1,7 +1,9 @@
 # Screen to endpoint map - Thaler Seeker
 
-Source: `docs/backend-openapi.yaml` v0.0.2 (42 paths, 47 operations, matches
-backend main 19cb78a4; route paths unchanged by #419). Auth: every `/v1/*`
+Source: `backend-openapi.yaml` v0.0.2, which lives only in the Thaler-Finance
+working tree at `docs/` and is never committed, so it cannot be resolved from a
+clone of this repo. It now carries 43 paths and 48 operations; the counts below
+were taken when it carried 42 and 47. Auth: every `/v1/*`
 needs x-api-key + Privy Bearer; `/health` and `/public/protocol/*` are open.
 The app never talks to Pacifica, Hyperliquid, or Kamino directly.
 
