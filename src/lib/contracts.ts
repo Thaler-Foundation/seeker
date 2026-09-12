@@ -8,15 +8,12 @@ export type AnalyticsKpis = {
   yield30dUsd: number;
   projectedApyBps: number;
   weightedAvgApyBps: number;
-  // protocol roi since open, realized yield over deposit, percent
   roiPct?: number;
   apy30dMedianBps?: number;
   tvl30dGrowthPct: number;
   tvl30dGrowthUsd?: number;
   vaults30dDelta: number;
-  // all time total yield generated, usd
   totalYieldGeneratedUsd?: number;
-  // all time total yield claimed to users, usd
   totalYieldClaimedUsd?: number;
 };
 
@@ -24,23 +21,17 @@ export type StrategyBreakdownRow = {
   mode: AnalyticsMode;
   vaultCount: number;
   tvlUsd: number;
-  // total sol deposited in the mode, price independent twin of tvlUsd
   tvlSol?: number;
   projectedApyBps: number;
-  // mode roi since open, active realized yield over active deposit, percent
   roiPct?: number;
   meanVaultApyBps?: number | null;
   apy30dMedianBps?: number | null;
-  // trailing 30d all components yield over mode equity, annualized, bps
   rolling30dApyBps?: number;
   pendingUsdcUsd?: number | null;
   yield30dUsd: number;
-  // lifetime all components yield, the total yield made, usd
   lifetimeYieldUsd?: number;
-  // same lifetime yield in sol, price independent, read this for the total yield box
   lifetimeYieldSol?: number;
   utilization: number;
-  // average kamino multiply forward net carry apy across the mode open vaults, bps
   avgMultiplyNetCarryBps?: number | null;
 };
 
@@ -61,8 +52,6 @@ export const TIER_ORDER: Tier[] = [
   'yolo',
 ];
 
-// Mirrors TIER_PARAMS minDepositSol/maxDepositSol. The API rejects anything
-// outside these, in packages/contracts/src/vaults.ts and again in the route.
 export const TIER_DEPOSIT_BOUNDS: Record<Tier, { minSol: number; maxSol: number }> = {
   safe: { minSol: 6, maxSol: 1111 },
   conservative: { minSol: 6, maxSol: 1111 },
@@ -83,6 +72,8 @@ export function maxDepositSol(t: Tier): number {
 export function isDepositWithinBounds(t: Tier, sol: number): boolean {
   return sol >= minDepositSol(t) && sol <= maxDepositSol(t);
 }
+
+export const OPEN_FEE_BUFFER_SOL = 0.06;
 
 export type VaultExecutionState =
   | 'PENDING'
@@ -108,7 +99,6 @@ export type VaultMetrics = {
   pendingRecycleUsd?: number | null;
 };
 
-// The step that stopped an open, when one failed.
 export type FailedStepRef = {
   stepNumber: number;
   kind: string;
@@ -117,18 +107,15 @@ export type FailedStepRef = {
 
 export type VaultSummary = {
   id: string;
-  // Vault wallet. Use it to match a vault to its perp position.
   walletAddress: string;
   state: VaultExecutionState;
   equityLamports: string;
   ltvBps: number;
-  // Multiply leverage the vault was opened with.
   multiplyLeverageBps: number;
   leverageBps: number;
   tier: Tier | null;
   createdAt: number;
   updatedAt: number;
-  // Open progress. Drives the building state on create and portfolio.
   stepsTotal: number;
   stepsCompleted: number;
   failedStep: FailedStepRef | null;

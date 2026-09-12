@@ -526,7 +526,10 @@ function ExportSection({
       <Text style={s.rowSub}>· Store the downloaded file somewhere only you can reach.</Text>
       <Pressable onPress={() => setAcknowledged((v) => !v)} style={s.rowL}>
         <View style={[s.checkbox, acknowledged && { backgroundColor: dark.foreground }]} />
-        <Text style={s.rowSub}>I understand the risks.</Text>
+        <Text style={s.rowSub}>
+          I understand that anyone with this key controls my funds, and this cannot be
+          undone.
+        </Text>
       </Pressable>
       <TextInput
         value={confirmText}
