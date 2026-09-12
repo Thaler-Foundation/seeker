@@ -1,6 +1,6 @@
 // Login: hero waves, title, Privy email OTP.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,9 +45,9 @@ export default function Login() {
     setBusy(false);
   };
 
-  if (auth.gate === 'allowed') {
-    router.replace('/(tabs)/home');
-  }
+  useEffect(() => {
+    if (auth.gate === 'allowed') router.replace('/(tabs)/home');
+  }, [auth.gate, router]);
 
   return (
     <View style={styles.root}>

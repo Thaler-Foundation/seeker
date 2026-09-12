@@ -40,7 +40,6 @@ function compactSol(v: number): string {
   return v.toFixed(2);
 }
 
-// sol amount primary, live usd smaller in parentheses, same as the web hero.
 function SolUsd({ sol, price }: { sol: number; price: number }) {
   return (
     <Text style={styles.kpiValue}>
@@ -139,14 +138,11 @@ export default function Analytics() {
   const breakdown = q.data?.strategyBreakdown ?? [];
   const num = (v: number | null | undefined) =>
     typeof v === 'number' && Number.isFinite(v) ? v : 0;
-  // sol-primary tvl + total yield summed from the per-mode rows, same as web.
   const totalTvlSol = breakdown.reduce((s, r) => s + num(r.tvlSol), 0);
   const totalYieldSol = breakdown.reduce((s, r) => s + num(r.lifetimeYieldSol), 0);
   const sumTvlUsd = breakdown.reduce((s, r) => s + num(r.tvlUsd), 0);
-  // live price, else the price implied by the server rows.
   const livePrice = pub.data?.ok ? pub.data.solPriceUsd : 0;
   const solPrice = livePrice > 0 ? livePrice : totalTvlSol > 0 ? sumTvlUsd / totalTvlSol : 0;
-  // total yield generated includes the pending unswapped usdc, same as the vault.
   const totalPendingUsdcUsd = breakdown.reduce((s, r) => s + num(r.pendingUsdcUsd), 0);
   const totalYieldGenSol = totalYieldSol + (solPrice > 0 ? totalPendingUsdcUsd / solPrice : 0);
   const KPIS: { label: string; value?: string; node?: ReactNode }[] = [
@@ -164,8 +160,6 @@ export default function Analytics() {
     { label: 'Active Vaults', value: k ? String(k.activeVaultCount) : '-' },
   ];
 
-  // total tvl over time in sol, the safe tier daily projected apr, and the
-  // asset + venue allocation, the same data the web analytics sections use.
   const tvlSeries: [number, number][] = (q.data?.tvlDailyUsd ?? [])
     .filter((p) => p.tvlUsd > 0)
     .map((p) => [Date.parse(p.date), solPrice > 0 ? p.tvlUsd / solPrice : 0] as [number, number])

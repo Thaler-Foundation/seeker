@@ -17,10 +17,6 @@ const TIERS = [
   { key: 'yolo', label: 'YOLO', color: tier.yolo, mode: 'F' },
 ] as const;
 
-function toThirtyDayApy(annualPct: number): number {
-  return (Math.pow(1 + annualPct / 100, 30 / 365) - 1) * 100;
-}
-
 function formatTvl(usd: number): string {
   if (usd >= 1e6) return `$${(usd / 1e6).toFixed(1)}M`;
   if (usd >= 1e3) return `$${(usd / 1e3).toFixed(0)}k`;
@@ -37,7 +33,6 @@ export default function Home() {
   const tvl = stats.data?.ok ? stats.data.tvlUsd : 0;
   const tvlSol = stats.data?.ok ? stats.data.tvlSol : 0;
   const solPrice = stats.data?.ok ? stats.data.solPriceUsd : 0;
-  const apy30 = stats.data?.ok ? toThirtyDayApy(stats.data.apy) : 0;
   const { getToken, authenticated } = useAuth();
   const analytics = useQuery({
     queryKey: ['analytics'],
@@ -49,7 +44,6 @@ export default function Home() {
     enabled: authenticated,
     staleTime: 60_000,
   });
-  // Projected APR per tier = latest point of that mode's daily series.
   const aprForMode = (mode: string): number | null => {
     const pts = (analytics.data?.apyByModeDaily ?? [])
       .filter((p) => p.mode === mode)
@@ -57,14 +51,13 @@ export default function Home() {
     const bps = pts.length ? pts[pts.length - 1]!.apyBps : undefined;
     return typeof bps === 'number' && Number.isFinite(bps) ? bps / 100 : null;
   };
-  // Deposits per tier = that mode's own SOL tvl from the strategy breakdown.
   const depositsForMode = (mode: string): number | null => {
     const row = (analytics.data?.strategyBreakdown ?? []).find((r) => r.mode === mode);
     if (!row) return null;
     const sol = row.tvlSol ?? (solPrice > 0 ? row.tvlUsd / solPrice : undefined);
     return typeof sol === 'number' && Number.isFinite(sol) ? sol : null;
   };
-  const safeApr = aprForMode('A') ?? apy30;
+  const safeApr = aprForMode('A');
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -101,7 +94,11 @@ export default function Home() {
             Kamino lend carry plus a Pacifica delta-neutral hedge. Yield in any market direction.
           </Text>
           <View style={styles.featStats}>
-            <TopStat label="Projected APR" value={`${safeApr.toFixed(2)}%`} tone={brand.success} />
+            <TopStat
+              label="Projected APR"
+              value={safeApr != null ? `${safeApr.toFixed(2)}%` : '-'}
+              tone={brand.success}
+            />
             <TopStat
               label="Total Deposits"
               value={tvlSol > 0 ? `${Math.round(tvlSol).toLocaleString()} SOL` : formatTvl(tvl)}

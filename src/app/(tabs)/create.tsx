@@ -1,4 +1,4 @@
-// Create: staged deposit flow, per tier amount, 0.06 SOL reserve.
+// Create: staged deposit flow, per tier amount, served fee reserve.
 
 import { useEffect, useState } from 'react';
 import { View, Text, Image, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
 import {
+  OPEN_FEE_BUFFER_SOL,
   TIER_ORDER,
   minDepositSol,
   maxDepositSol,
@@ -16,8 +17,6 @@ import {
 import { useAuth } from '@/lib/auth';
 import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
 import { TermsModal } from '@/components/terms-modal';
-
-const RESERVE_SOL = 0.06;
 
 const TIER_LABEL: Record<Tier, string> = {
   safe: 'Safe',
@@ -51,6 +50,7 @@ const STEP_LABELS: Record<string, string> = {
 type PreviewResponse = {
   finalState?: { collateralSol?: number; debtSol?: number };
   perpPlan?: { notionalSol?: number };
+  openFeeBufferLamports?: string;
 };
 type CreateWalletsResponse = { pairId: string };
 type BalanceResponse = { address: string; lamports: string };
@@ -78,7 +78,6 @@ export default function Create() {
   const withinBounds = isDepositWithinBounds(selectedTier, depositSol);
   const equityLamports = String(Math.round(depositSol * 1_000_000_000));
 
-  // Switching tier resets the amount to that tier's minimum, like the web panel.
   const pickTier = (t: Tier) => {
     setSelectedTier(t);
     setAmount(String(minDepositSol(t)));
@@ -121,7 +120,9 @@ export default function Create() {
     enabled: authenticated && stage === 'fund',
     refetchInterval: 5000,
   });
-  const requiredLamports = depositSol * 1e9 + RESERVE_SOL * 1e9;
+  const reserveSol =
+    Number(preview.data?.openFeeBufferLamports ?? OPEN_FEE_BUFFER_SOL * 1e9) / 1e9;
+  const requiredLamports = depositSol * 1e9 + reserveSol * 1e9;
   const currentLamports = Number(balance.data?.lamports ?? '0');
   const funded = currentLamports >= requiredLamports;
 
@@ -152,7 +153,6 @@ export default function Create() {
   const totalSteps = openState.data?.steps.length || 8;
   const pendingSteps = Object.keys(STEP_LABELS).map((kind) => ({ kind, state: 'PENDING' }));
 
-  // vault built: show the live line briefly, then go to the portfolio tab like web.
   const executionState = openState.data?.execution.state;
   useEffect(() => {
     if (executionState !== 'DONE') return;
@@ -253,7 +253,7 @@ export default function Create() {
                 tone={brand.success}
               />
               <MiniRow label="Service Fee" value="11% (on yield)" />
-              <MiniRow label="Vault Creation Fee" value={`${RESERVE_SOL} SOL reserve`} />
+              <MiniRow label="Vault Creation Fee" value={`${reserveSol} SOL reserve`} />
             </View>
             <Pressable
               accessibilityRole="button"
@@ -289,7 +289,7 @@ export default function Create() {
                   <MiniRow label="Deployed to strategy" value={`${depositSol.toFixed(2)} SOL`} />
                   <MiniRow
                     label="Fee reserve (one-time)"
-                    value={`${RESERVE_SOL.toFixed(2)} SOL`}
+                    value={`${reserveSol.toFixed(2)} SOL`}
                   />
                   {currentLamports > requiredLamports ? (
                     <MiniRow
@@ -312,7 +312,7 @@ export default function Create() {
                   <MiniRow label="Vault equity" value={`${depositSol.toFixed(2)} SOL`} />
                   <MiniRow
                     label="Fee reserve (network + setup)"
-                    value={`${RESERVE_SOL.toFixed(2)} SOL`}
+                    value={`${reserveSol.toFixed(2)} SOL`}
                   />
                 </View>
                 <Text style={styles.mutedSm}>Send to your Thaler wallet</Text>

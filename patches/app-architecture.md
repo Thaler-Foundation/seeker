@@ -56,10 +56,22 @@ Root stack (src/app/_layout.tsx): index -> (tabs) -> vault/[risk] -> wallet
 1. PrivyProvider boots from EXPO_PUBLIC_PRIVY_APP_ID / EXPO_PUBLIC_PRIVY_CLIENT_ID
    (missing app id renders an unauthenticated context instead of crashing).
 2. Login screen: email -> sendCode -> loginWithCode (Privy OTP).
-3. On login, POST {BFF}/api/auth/allowlist with the Privy bearer token:
+3. Whenever Privy is ready with a user, including a session restored from secure
+   storage, POST {BFF}/api/auth/allowlist with the Privy bearer token:
    200 allowed, 403 denied ("This account is not on the Thaler beta list."),
-   else error ("Verification failed. Please try again.").
-4. `useAuth()` exposes ready/authenticated/email/gate/getToken/signOut;
+   else error ("Verification failed. Please try again."). A ref keyed on the
+   email runs it once per account and clears on the error branch. A Privy
+   account carrying no email address sets the error state instead ("No verified
+   email on this Privy account. Sign out and try again.").
+4. On the same condition, POST {BFF}/api/thaler/dual-wallet once per session to
+   provision the Solana dual-signer wallet. A 401 leaves it done; any other
+   failure re-arms it.
+5. A 401 on any query or mutation triggers one token refresh at a time, at most
+   one per 5 seconds: a null token signs out and clears the query cache, an
+   unchanged token stops without refetching, a new token invalidates all queries.
+6. Sign-out clears the query cache, and so does the authenticated session
+   dropping.
+7. `useAuth()` exposes ready/authenticated/email/gate/gateError/getToken/signOut;
    every authorized query calls `getToken()` per request.
 
 ## Data layer

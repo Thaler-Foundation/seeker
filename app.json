@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "finance.thaler.seeker"
+      "package": "finance.thaler.seeker",
+      "versionCode": 1
     },
     "web": {
       "output": "static",

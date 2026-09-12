@@ -88,8 +88,6 @@ export default function Portfolio() {
     staleTime: 60_000,
   });
 
-  // vaults list carries the deposit (equityLamports) + ltv the stats view lacks;
-  // joined by id for per-vault roi and ltv, matching the web portfolio.
   const vaultList = useQuery({
     queryKey: ['vaults'],
     queryFn: async () => fetchThaler<ListVaultsResponse>(await getToken(), endpoints.vaults),
@@ -198,7 +196,6 @@ export default function Portfolio() {
   const netValueSol = rows.reduce((s, r) => s + Number(r.equityNavLamports) / 1e9, 0);
   const yieldEarnedSol = rows.reduce((s, r) => s + Number(r.realizedYieldLamports) / 1e9, 0);
   const claimableNet = stats.data?.claimableNetTotalSol ?? 0;
-  // deposited principal across all vaults = the roi denominator (matches web).
   const depositedSol = rows.reduce((s, r) => {
     const v = vaultById.get(r.vaultExecutionId);
     return s + (v ? Number(v.equityLamports) / 1e9 : 0);

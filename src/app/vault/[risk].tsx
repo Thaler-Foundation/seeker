@@ -1,6 +1,6 @@
 // Vault detail: mobile port of apps/web vault/[risk] with live API data.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, ScrollView, Pressable, Share, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,6 +14,7 @@ import {
   type VaultPositions,
   type UserVaultStatsView,
 } from '@/lib/api';
+import { OPEN_FEE_BUFFER_SOL } from '@/lib/contracts';
 import { useAuth } from '@/lib/auth';
 import { dark, brand, radius, spacing } from '@/theme/tokens';
 
@@ -77,7 +78,7 @@ const FAQS = [
   },
   {
     q: 'What are the fees?',
-    a: 'A one-time vault creation reserve of 0.06 SOL (covers network + setup costs), and an 11% service fee charged only on the yield you claim. There is no fee on your principal.',
+    a: `A one-time vault creation reserve of ${OPEN_FEE_BUFFER_SOL} SOL (covers network + setup costs), and an 11% service fee charged only on the yield you claim. There is no fee on your principal.`,
   },
   {
     q: 'Can I withdraw anytime?',
@@ -115,10 +116,21 @@ type Breakdown = {
 };
 type AnalyticsResponse = {
   strategyBreakdown: Breakdown[];
+  tvlDailyUsd?: { date: string; tvlUsd: number }[];
   tvlByModeDaily?: { date: string; mode: string; tvlUsd: number }[];
   apyByModeDaily?: { date: string; mode: string; apyBps: number }[];
 };
 type VaultRow = ListVaultsResponse['vaults'][number];
+
+function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(total / 86_400);
+  const h = Math.floor((total % 86_400) / 3_600);
+  const m = Math.floor((total % 3_600) / 60);
+  const sec = total % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return d > 0 ? `${d}d ${pad(h)}h ${pad(m)}m ${pad(sec)}s` : `${pad(h)}h ${pad(m)}m ${pad(sec)}s`;
+}
 
 function toLine(points: [number, number][], w = 100, h = 40): string | null {
   if (points.length < 2) return null;
@@ -305,7 +317,6 @@ export default function VaultDetail() {
     refetchInterval: 30_000,
   });
 
-  // per-mode daily projected apr series, the same source the web charts use.
   const modeApyDaily: [number, number][] = useMemo(
     () =>
       (analytics.data?.apyByModeDaily ?? [])
@@ -338,13 +349,17 @@ export default function VaultDetail() {
       .map((p) => [Date.parse(p.date), p.tvlUsd / solPrice] as [number, number])
       .sort((a, b) => a[0] - b[0]);
   }, [analytics.data, meta.mode, solPrice]);
-  const apySeries: [number, number][] = useMemo(
-    () =>
-      modeApyDaily.length
-        ? modeApyDaily
-        : (apyHistory.data?.points ?? []).map((p) => [p.ts, p.apyBps / 100] as [number, number]),
-    [modeApyDaily, apyHistory.data]
-  );
+  const apySeries: [number, number][] = useMemo(() => {
+    if (modeApyDaily.length) return modeApyDaily;
+    if (!(annualApy > 0)) return [];
+    const points = apyHistory.data?.points ?? [];
+    const dates = points.length
+      ? points.map((p) => p.ts)
+      : (analytics.data?.tvlDailyUsd ?? []).map((p) => Date.parse(p.date));
+    return dates
+      .map((t) => [t, annualApy] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+  }, [modeApyDaily, apyHistory.data, analytics.data, annualApy]);
 
   const medianApy = (APY_RANGE[tier].min + APY_RANGE[tier].max) / 2 / 100;
   const posRoiAt = (d: number) => (Math.pow(1 + medianApy, d / 365) - 1) * 100;
@@ -549,7 +564,6 @@ function rowMetrics(v: VaultRow, pos: VaultPositions | undefined, solPriceUsd: n
       ? Number(p.realizedYieldLamports) / LAMPORTS
       : Number(v.metrics?.claimableSol ?? 0);
   const dep = Number(v.equityLamports) / LAMPORTS;
-  // roi = realized yield over deposit, percent (same basis as the web).
   const roi = dep > 0 ? (yieldSol / dep) * 100 : 0;
   const ltv = Number(v.ltvBps ?? 0) / 100;
   const f = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -758,11 +772,33 @@ function PositionDetail({
   const claimableNet = statRow?.claimableNetSol ?? 0;
   const cp = p?.claimPreview ?? null;
   const [claimNote, setClaimNote] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const claimNextAllowedAtMs = p?.claimNextAllowedAtMs ?? null;
+  const claimCoolingDown = claimNextAllowedAtMs != null && nowMs < claimNextAllowedAtMs;
+  const claimCooldownMsLeft =
+    claimNextAllowedAtMs != null ? Math.max(0, claimNextAllowedAtMs - nowMs) : 0;
+  const closeUnlockAtMs = p?.closeUnlockAtMs ?? null;
+  const closeLocked = closeUnlockAtMs != null && nowMs < closeUnlockAtMs;
+  const closeUnlockMsLeft = closeUnlockAtMs != null ? Math.max(0, closeUnlockAtMs - nowMs) : 0;
+  const penaltyBps = p?.earlyClose?.penaltyBps ?? 0;
+  const penaltyPct = !closeLocked && penaltyBps > 0 ? penaltyBps / 100 : 0;
+  const penaltyDecayDays = Math.round((p?.earlyClose?.decaySeconds ?? 0) / 86_400);
+  useEffect(() => {
+    if (!claimCoolingDown && !closeLocked) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, [claimCoolingDown, closeLocked]);
   const claim = useMutation({
     mutationFn: async () =>
       fetchThaler(await getToken(), endpoints.vaultClaim(vault.id), { method: 'POST' }),
     onSuccess: () => setClaimNote('Claim started.'),
     onError: (e) => setClaimNote(e instanceof Error ? e.message : 'Claim failed.'),
+  });
+  const close = useMutation({
+    mutationFn: async () =>
+      fetchThaler(await getToken(), endpoints.vaultClose(vault.id), { method: 'POST' }),
+    onSuccess: () => setClaimNote('Close started.'),
+    onError: (e) => setClaimNote(e instanceof Error ? e.message : 'Could not start close.'),
   });
 
   const onShare = () => {
@@ -845,7 +881,9 @@ function PositionDetail({
         <View style={s.claimBox}>
           <View style={s.spreadRow}>
             <Text style={s.muted}>Claimable yield</Text>
-            <Text style={s.muted}>Net (after 11% fee)</Text>
+            <Text style={s.muted}>
+              {`Net (after ${cp ? (cp.serviceFeeBps / 100).toFixed(0) : '11'}% fee)`}
+            </Text>
           </View>
           <View style={s.spreadRow}>
             <View style={s.rowL}>
@@ -902,12 +940,40 @@ function PositionDetail({
         ) : null}
         <Pressable
           accessibilityRole="button"
-          disabled={claim.isPending || claimableNet <= 0}
+          disabled={claim.isPending || claimableNet <= 0 || claimCoolingDown}
           onPress={() => claim.mutate()}
-          style={[s.btnPrimary, (claim.isPending || claimableNet <= 0) && { opacity: 0.5 }]}
+          style={[
+            s.btnPrimary,
+            (claim.isPending || claimableNet <= 0 || claimCoolingDown) && { opacity: 0.5 },
+          ]}
         >
-          <Text style={s.btnPrimaryLabel}>{claim.isPending ? 'Claiming…' : 'Claim yield'}</Text>
+          <Text style={s.btnPrimaryLabel}>
+            {claim.isPending
+              ? 'Claiming…'
+              : claimCoolingDown
+                ? `Unlocks in ${formatCountdown(claimCooldownMsLeft)}`
+                : 'Claim yield'}
+          </Text>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={close.isPending || closeLocked}
+          onPress={() => close.mutate()}
+          style={[s.btnOutline, { marginTop: 8 }, (close.isPending || closeLocked) && { opacity: 0.5 }]}
+        >
+          <Text style={s.btnOutlineLabel}>
+            {close.isPending
+              ? 'Closing…'
+              : closeLocked
+                ? `Close unlocks in ${formatCountdown(closeUnlockMsLeft)}`
+                : 'Close vault'}
+          </Text>
+        </Pressable>
+        {penaltyPct > 0 ? (
+          <Text style={[s.muted12, { marginTop: 8 }]}>
+            {`Early close penalty ${penaltyPct.toFixed(2)}%, decaying over ${penaltyDecayDays} days.`}
+          </Text>
+        ) : null}
         {claimNote ? <Text style={[s.muted12, { marginTop: 8 }]}>{claimNote}</Text> : null}
       </View>
     </>
