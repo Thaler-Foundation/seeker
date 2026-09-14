@@ -405,25 +405,34 @@ export default function Portfolio() {
           </View>
         ) : (
           <View style={styles.list}>
-            {(history.data ?? []).map((r, i) => (
-              <View key={r.id} style={[styles.row, i > 0 && styles.rowBorder]}>
-                <View style={styles.rowTextL}>
+            {(history.data ?? []).length > 0 ? (
+              <View style={styles.row}>
+                <Text style={[styles.acDate, styles.acHeadCell]}>DATE</Text>
+                <Text style={[styles.acType, styles.acHeadCell]}>TYPE</Text>
+                <Text style={[styles.acDetail, styles.acHeadCell]}>DETAIL</Text>
+                <Text style={[styles.acAmount, styles.acHeadCell]}>AMOUNT</Text>
+              </View>
+            ) : null}
+            {(history.data ?? []).map((r) => (
+              <View key={r.id} style={[styles.row, styles.rowBorder]}>
+                <Text style={[styles.rowDetail, styles.acDate]} numberOfLines={1}>
+                  {rel(r.ts)}
+                </Text>
+                <View style={styles.acType}>
                   <View style={styles.typeBadge}>
                     <Text style={styles.typeBadgeLabel}>{r.interaction}</Text>
                   </View>
-                  <Text style={styles.rowDetail}>{r.detail}</Text>
                 </View>
-                <View style={styles.rowTextR}>
-                  <Text
-                    style={[
-                      styles.rowValue,
-                      r.amount.startsWith('+') && { color: brand.success },
-                    ]}
-                  >
-                    {r.amount}
-                  </Text>
-                  <Text style={styles.rowDetail}>{rel(r.ts)}</Text>
-                </View>
+                <Text style={[styles.rowDetail, styles.acDetail]}>{r.detail}</Text>
+                <Text
+                  style={[
+                    styles.rowValue,
+                    styles.acAmount,
+                    r.amount.startsWith('+') && { color: brand.success },
+                  ]}
+                >
+                  {r.amount}
+                </Text>
               </View>
             ))}
             {authenticated && !history.isLoading && (history.data ?? []).length === 0 ? (
@@ -534,8 +543,6 @@ const styles = StyleSheet.create({
   },
   rowBorder: { borderTopColor: dark.border, borderTopWidth: 1 },
   rowL: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowTextL: { gap: 2 },
-  rowTextR: { alignItems: 'flex-end', gap: 2 },
   dot: { width: 12, height: 12, borderRadius: 6 },
   rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   rowDetail: { color: dark.mutedForeground, fontSize: 12 },
@@ -544,5 +551,10 @@ const styles = StyleSheet.create({
   pfName: { flex: 1.6, minWidth: 0 },
   pfCell: { flex: 1, fontSize: 11, textAlign: 'right' },
   pfHeadCell: { color: dark.mutedForeground, fontSize: 9, letterSpacing: 0.6, fontWeight: '600' },
+  acHeadCell: { color: dark.mutedForeground, fontSize: 11, letterSpacing: 0.6, fontWeight: '600' },
+  acDate: { flex: 0.6, fontSize: 11 },
+  acType: { flex: 1.2 },
+  acDetail: { flex: 1.4, fontSize: 11 },
+  acAmount: { flex: 0.95, fontSize: 11, textAlign: 'right' },
   empty: { padding: spacing.base, gap: 4 },
 });
