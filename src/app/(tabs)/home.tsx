@@ -1,11 +1,13 @@
 // Home: vaults grid with live stats from /api/stats.
 
+import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { HowItWorksModal } from '@/components/how-it-works-modal';
 import { dark, tier, radius, spacing, brand } from '@/theme/tokens';
 
 const TIERS = [
@@ -25,6 +27,7 @@ function formatTvl(usd: number): string {
 
 export default function Home() {
   const router = useRouter();
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const stats = useQuery({
     queryKey: ['public-stats'],
     queryFn: () => fetchThaler<PublicStats>(null, endpoints.publicStats),
@@ -81,7 +84,9 @@ export default function Home() {
 
         <View style={styles.featHead}>
           <Text style={styles.eyebrow}>FEATURED</Text>
-          <Text style={styles.howItWorks}>How it works</Text>
+          <Pressable accessibilityRole="button" onPress={() => setHowItWorksOpen(true)}>
+            <Text style={styles.howItWorks}>How it works</Text>
+          </Pressable>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -131,6 +136,7 @@ export default function Home() {
           })}
         </View>
       </ScrollView>
+      <HowItWorksModal open={howItWorksOpen} onClose={() => setHowItWorksOpen(false)} />
     </SafeAreaView>
   );
 }
