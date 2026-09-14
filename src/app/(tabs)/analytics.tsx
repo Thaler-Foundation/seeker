@@ -1,7 +1,7 @@
 // Analytics: protocol KPIs and strategy breakdown from /v1/analytics.
 
 import { type ReactNode } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -142,6 +142,9 @@ function AllocList({
 }
 
 export default function Analytics() {
+  // Table type and spacing scale with the row width, floored so it never reaches 0.
+  const { width } = useWindowDimensions();
+  const scale = Math.max(0.6, Math.min(1, (width - 66) / 346));
   const { getToken, authenticated } = useAuth();
   const q = useQuery({
     queryKey: ['analytics'],
@@ -291,14 +294,19 @@ export default function Analytics() {
           <Text style={[styles.eyebrow, { padding: spacing.base, paddingBottom: 8 }]}>
             STRATEGY BREAKDOWN
           </Text>
-          <View style={[styles.row, styles.rowBorder]}>
-            <View style={styles.bdName} />
-            <Text style={[styles.bdHeadCell, styles.bdCell]}>POSITIONS</Text>
-            <Text style={[styles.bdHeadCell, styles.bdCell]}>TVL</Text>
-            <Text style={[styles.bdHeadCell, styles.bdCell]}>APR</Text>
-            <Text style={[styles.bdHeadCell, styles.bdCell]}>YIELD</Text>
-            <Text style={[styles.bdHeadCell, styles.bdCell]}>UTIL</Text>
-          </View>
+          {breakdown.length > 0 ? (
+            <View style={[styles.row, styles.rowBorder]}>
+              <View style={styles.bdName} />
+              {['POSITIONS', 'TVL', 'APR', 'YIELD', 'UTIL'].map((h) => (
+                <Text
+                  key={h}
+                  style={[styles.bdCell, styles.bdHeadCell, { fontSize: 8 * scale, letterSpacing: 0.4 * scale }]}
+                >
+                  {h}
+                </Text>
+              ))}
+            </View>
+          ) : null}
           {breakdown.map((r) => {
             const meta = MODE_META[r.mode] ?? MODE_META.A;
             const chartAprBps = latestAprBpsByMode[r.mode];
@@ -313,21 +321,26 @@ export default function Analytics() {
             const yieldSol = num(r.lifetimeYieldSol) + pendingSol;
             return (
               <View key={r.mode} style={[styles.row, styles.rowBorder]}>
-                <View style={[styles.rowL, styles.bdName]}>
-                  <View style={[styles.dot, { backgroundColor: meta.color }]} />
-                  <Text style={styles.rowLabel}>{meta.label}</Text>
+                <View style={[styles.rowL, styles.bdName, { gap: 8 * scale }]}>
+                  <View
+                    style={[
+                      styles.dot,
+                      { backgroundColor: meta.color, width: 10 * scale, height: 10 * scale, borderRadius: 5 * scale },
+                    ]}
+                  />
+                  <Text style={[styles.rowLabel, { fontSize: 11 * scale }]}>{meta.label}</Text>
                 </View>
-                <Text style={[styles.rowValue, styles.bdCell]}>{r.vaultCount}</Text>
-                <Text style={[styles.rowValue, styles.bdCell]}>
+                <Text style={[styles.rowValue, styles.bdCell, { fontSize: 9 * scale }]}>{r.vaultCount}</Text>
+                <Text style={[styles.rowValue, styles.bdCell, { fontSize: 9 * scale }]}>
                   {`${compactSol(num(r.tvlSol))} SOL`}
                 </Text>
-                <Text style={[styles.rowValue, styles.bdCell]}>
+                <Text style={[styles.rowValue, styles.bdCell, { fontSize: 9 * scale }]}>
                   {aprBps != null ? `${(aprBps / 100).toFixed(1)}%` : '-'}
                 </Text>
-                <Text style={[styles.rowValue, styles.bdCell]}>
+                <Text style={[styles.rowValue, styles.bdCell, { fontSize: 9 * scale }]}>
                   {`${compactSol(yieldSol)} SOL`}
                 </Text>
-                <Text style={[styles.rowValue, styles.bdCell]}>
+                <Text style={[styles.rowValue, styles.bdCell, { fontSize: 9 * scale }]}>
                   {`${(num(r.utilization) * 100).toFixed(0)}%`}
                 </Text>
               </View>
@@ -386,8 +399,8 @@ const styles = StyleSheet.create({
   rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   rowValue: { color: dark.foreground, fontSize: 12, fontVariant: ['tabular-nums'] },
   bdName: { flex: 1.7, minWidth: 0 },
-  bdCell: { flex: 1, fontSize: 11, textAlign: 'right' },
-  bdHeadCell: { color: dark.mutedForeground, fontSize: 9, letterSpacing: 0.6, fontWeight: '600' },
+  bdCell: { flex: 1, fontSize: 9, textAlign: 'right' },
+  bdHeadCell: { color: dark.mutedForeground, fontSize: 8, letterSpacing: 0.4, fontWeight: '600' },
   soon: { color: dark.mutedForeground, fontSize: 12 },
   chartCard: {
     backgroundColor: dark.card,
