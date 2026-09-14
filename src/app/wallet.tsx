@@ -273,7 +273,7 @@ export default function WalletSheet() {
     <SafeAreaView style={s.root} edges={['top']}>
       <ScrollView contentContainerStyle={s.scroll}>
         <View style={s.headRow}>
-          <Pressable onPress={onCopy} style={s.rowL}>
+          <Pressable accessibilityRole="button" onPress={onCopy} style={s.rowL}>
             <WalletGlyph />
             <Text style={s.addr}>{address ? shortAddr(address) : 'Wallet'}</Text>
             <Text style={s.copyHint}>{copied ? 'Copied' : 'Copy'}</Text>
