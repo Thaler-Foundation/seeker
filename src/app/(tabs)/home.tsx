@@ -113,23 +113,31 @@ export default function Home() {
 
         <Text style={styles.eyebrow}>ALL VAULTS</Text>
         <View style={styles.list}>
-          {TIERS.map((t, i) => {
+          <View style={styles.row}>
+            <View style={styles.hmName}>
+              <Text style={styles.hmHeadCell}>VAULT</Text>
+            </View>
+            <Text style={[styles.hmHeadCell, styles.hmCell]}>PROJECTED APR</Text>
+            <Text style={[styles.hmHeadCell, styles.hmCell]}>DEPOSITED</Text>
+          </View>
+          {TIERS.map((t) => {
             const apr = aprForMode(t.mode);
             const dep = depositsForMode(t.mode);
             return (
               <Pressable
                 key={t.key}
                 onPress={() => router.push(`/vault/${t.key}`)}
-                style={[styles.row, i > 0 && styles.rowBorder]}
+                style={[styles.row, styles.rowBorder]}
               >
-                <View style={styles.rowLeft}>
+                <View style={[styles.rowLeft, styles.hmName]}>
                   <View style={[styles.dot, { backgroundColor: t.color }]} />
                   <Text style={styles.rowLabel}>{t.label} Vault</Text>
                 </View>
-                <Text style={styles.rowValue}>
-                  {`${apr != null ? `${apr.toFixed(2)}%` : '-'}  ${
-                    dep != null ? `${Math.round(dep).toLocaleString()} SOL` : '-'
-                  }`}
+                <Text style={[styles.rowValue, styles.hmCell]}>
+                  {apr != null ? `${apr.toFixed(2)}%` : '-'}
+                </Text>
+                <Text style={[styles.rowValue, styles.hmCell]}>
+                  {dep != null ? `${Math.round(dep).toLocaleString()} SOL` : '-'}
                 </Text>
               </Pressable>
             );
@@ -201,5 +209,8 @@ const styles = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6 },
   rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   rowValue: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'] },
+  hmName: { flex: 2, minWidth: 0 },
+  hmCell: { flex: 1, fontSize: 12, textAlign: 'right' },
+  hmHeadCell: { color: dark.mutedForeground, fontSize: 9, letterSpacing: 0.6, fontWeight: '600' },
   soon: { color: dark.mutedForeground, fontSize: 12 },
 });
