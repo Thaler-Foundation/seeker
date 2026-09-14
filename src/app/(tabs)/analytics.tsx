@@ -224,6 +224,16 @@ export default function Analytics() {
       .map((p) => [Date.parse(p.date), p.apyBps / 100] as [number, number])
       .sort((a, b) => a[0] - b[0]),
   }));
+  // Latest point of each mode's APR series, the value the chart above plots.
+  const latestAprBpsByMode: Record<string, number> = {};
+  const latestAprDateByMode: Record<string, number> = {};
+  for (const p of q.data?.apyByModeDaily ?? []) {
+    const t = Date.parse(p.date);
+    if (latestAprDateByMode[p.mode] === undefined || t > latestAprDateByMode[p.mode]!) {
+      latestAprDateByMode[p.mode] = t;
+      latestAprBpsByMode[p.mode] = p.apyBps;
+    }
+  }
   const ASSET_COLOR: Record<string, string> = { jitoSOL: '#4ADE80', mSOL: '#166534', SOL: '#9945FF' };
   const VENUE_COLOR: Record<string, string> = { hyperliquid: '#50E3C2', pacifica: '#3B7BBE', kamino: '#00BCD4' };
   const assetRows = (q.data?.assetAllocation ?? []).map((a) => ({
@@ -291,7 +301,14 @@ export default function Analytics() {
           </View>
           {breakdown.map((r) => {
             const meta = MODE_META[r.mode] ?? MODE_META.A;
-            const aprBps = r.apy30dMedianBps;
+            const chartAprBps = latestAprBpsByMode[r.mode];
+            const fallbackAprBps = r.apy30dMedianBps;
+            const aprBps =
+              typeof chartAprBps === 'number' && Number.isFinite(chartAprBps)
+                ? chartAprBps
+                : typeof fallbackAprBps === 'number' && Number.isFinite(fallbackAprBps)
+                  ? fallbackAprBps
+                  : null;
             const pendingSol = solPrice > 0 ? num(r.pendingUsdcUsd) / solPrice : 0;
             const yieldSol = num(r.lifetimeYieldSol) + pendingSol;
             return (
