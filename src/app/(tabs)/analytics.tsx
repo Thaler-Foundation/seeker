@@ -49,23 +49,34 @@ function SolUsd({ sol, price }: { sol: number; price: number }) {
   );
 }
 
-function MiniChart({ data, color }: { data: [number, number][]; color: string }) {
-  if (data.length < 2) return <Text style={styles.chartEmpty}>No data yet.</Text>;
-  const xs = data.map((p) => p[0]);
-  const ys = data.map((p) => p[1]);
+type ChartSeries = { label: string; color: string; data: [number, number][] };
+
+function MiniChart({ series }: { series: ChartSeries[] }) {
+  const drawable = series.filter((s) => s.data.length >= 2);
+  if (drawable.length === 0) return <Text style={styles.chartEmpty}>No data yet.</Text>;
+  const xs = drawable.flatMap((s) => s.data.map((p) => p[0]));
+  const ys = drawable.flatMap((s) => s.data.map((p) => p[1]));
   const x0 = Math.min(...xs);
   const spanX = Math.max(...xs) - x0 || 1;
   const yMin = Math.min(...ys);
   const spanY = Math.max(...ys) - yMin || 1;
-  const pts = data
-    .map(
-      ([x, y]) =>
-        `${(((x - x0) / spanX) * 100).toFixed(2)},${(1 + (1 - (y - yMin) / spanY) * 38).toFixed(2)}`
-    )
-    .join(' ');
   return (
     <Svg width="100%" height={120} viewBox="0 0 100 40" preserveAspectRatio="none">
-      <Polyline points={pts} fill="none" stroke={color} strokeWidth={0.7} strokeLinejoin="round" />
+      {drawable.map((s) => (
+        <Polyline
+          key={s.label}
+          points={s.data
+            .map(
+              ([x, y]) =>
+                `${(((x - x0) / spanX) * 100).toFixed(2)},${(1 + (1 - (y - yMin) / spanY) * 38).toFixed(2)}`
+            )
+            .join(' ')}
+          fill="none"
+          stroke={s.color}
+          strokeWidth={0.7}
+          strokeLinejoin="round"
+        />
+      ))}
     </Svg>
   );
 }
@@ -73,19 +84,29 @@ function MiniChart({ data, color }: { data: [number, number][]; color: string })
 function ChartCard({
   title,
   sub,
-  data,
-  color,
+  series,
+  legend,
 }: {
   title: string;
   sub: string;
-  data: [number, number][];
-  color: string;
+  series: ChartSeries[];
+  legend?: boolean;
 }) {
   return (
     <View style={styles.chartCard}>
       <Text style={styles.chartTitle}>{title}</Text>
       <Text style={styles.chartSub}>{sub}</Text>
-      <MiniChart data={data} color={color} />
+      <MiniChart series={series} />
+      {legend ? (
+        <View style={styles.legend}>
+          {series.map((s) => (
+            <View key={s.label} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: s.color }]} />
+              <Text style={styles.legendLabel}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -164,10 +185,14 @@ export default function Analytics() {
     .filter((p) => p.tvlUsd > 0)
     .map((p) => [Date.parse(p.date), solPrice > 0 ? p.tvlUsd / solPrice : 0] as [number, number])
     .sort((a, b) => a[0] - b[0]);
-  const aprSeries: [number, number][] = (q.data?.apyByModeDaily ?? [])
-    .filter((p) => p.mode === 'A')
-    .map((p) => [Date.parse(p.date), p.apyBps / 100] as [number, number])
-    .sort((a, b) => a[0] - b[0]);
+  const aprSeries: ChartSeries[] = Object.entries(MODE_META).map(([mode, meta]) => ({
+    label: meta.label,
+    color: meta.color,
+    data: (q.data?.apyByModeDaily ?? [])
+      .filter((p) => p.mode === mode)
+      .map((p) => [Date.parse(p.date), p.apyBps / 100] as [number, number])
+      .sort((a, b) => a[0] - b[0]),
+  }));
   const ASSET_COLOR: Record<string, string> = { jitoSOL: '#4ADE80', mSOL: '#166534', SOL: '#9945FF' };
   const VENUE_COLOR: Record<string, string> = { hyperliquid: '#50E3C2', pacifica: '#3B7BBE', kamino: '#00BCD4' };
   const assetRows = (q.data?.assetAllocation ?? []).map((a) => ({
@@ -198,8 +223,12 @@ export default function Analytics() {
             </View>
           ))}
         </View>
-        <ChartCard title="Total Value Locked" sub="protocol tvl in sol" data={tvlSeries} color="#9945FF" />
-        <ChartCard title="Projected APR" sub="safe tier daily" data={aprSeries} color={tier.safe} />
+        <ChartCard
+          title="Total Value Locked"
+          sub="protocol tvl in sol"
+          series={[{ label: 'TVL', color: '#9945FF', data: tvlSeries }]}
+        />
+        <ChartCard title="Projected APR" sub="per strategy tier" series={aprSeries} legend />
         <View style={styles.list}>
           <AllocList title="ASSET ALLOCATION" rows={assetRows} />
           <View style={styles.allocDivider} />
@@ -310,6 +339,10 @@ const styles = StyleSheet.create({
   chartTitle: { color: dark.foreground, fontSize: 15, fontWeight: '600' },
   chartSub: { color: dark.mutedForeground, fontSize: 12 },
   chartEmpty: { color: dark.mutedForeground, fontSize: 13, textAlign: 'center', paddingVertical: 40 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.base, rowGap: 6 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 2 },
+  legendLabel: { color: dark.mutedForeground, fontSize: 11 },
   allocBlock: { padding: spacing.base, gap: 10 },
   allocRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   allocName: { color: dark.foreground, fontSize: 13, width: 92 },
