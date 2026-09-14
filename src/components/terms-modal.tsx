@@ -63,6 +63,7 @@ export function TermsModal({
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setScrolledToBottom(false);
       setAccepted(false);
     }

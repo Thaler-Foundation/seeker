@@ -195,7 +195,9 @@ export default function WalletSheet() {
   const totalUsd = totalSol * solPrice;
 
   const rel = (ts: number) => {
+    // eslint-disable-next-line react-hooks/purity
     const h = Math.floor((Date.now() - ts) / 3_600_000);
+    // eslint-disable-next-line react-hooks/purity
     if (h < 1) return `${Math.max(1, Math.floor((Date.now() - ts) / 60_000))}m ago`;
     if (h < 24) return `${h}h ago`;
     return `${Math.floor(h / 24)}d ago`;
