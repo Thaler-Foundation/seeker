@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   rowLabel: { color: dark.foreground, fontSize: 11, fontWeight: '500' },
   rowDetail: { color: dark.mutedForeground, fontSize: 12 },
   rowValue: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'] },
-  rowNums: { flex: 3, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  rowNums: { flex: 3, flexDirection: 'row', gap: 8, alignItems: 'center' },
   pfName: { flex: 1.6, minWidth: 0 },
   pfCellVal: { fontSize: 11, textAlign: 'right' },
   pfHeadCell: { color: dark.mutedForeground, fontSize: 7, letterSpacing: 0.4, fontWeight: '600' },

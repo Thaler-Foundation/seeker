@@ -44,7 +44,7 @@ export function HowItWorksModal({ open, onClose }: { open: boolean; onClose: () 
             ))}
             <Text style={s.outro}>
               Still have questions?{' '}
-              <Text style={s.link} onPress={() => Linking.openURL(DOCS_URL)}>
+              <Text style={s.link} onPress={() => void Linking.openURL(DOCS_URL).catch(() => {})}>
                 Read our docs
               </Text>
             </Text>

@@ -52,7 +52,9 @@ function SolUsd({ sol, price }: { sol: number; price: number }) {
 type ChartSeries = { label: string; color: string; data: [number, number][] };
 
 function MiniChart({ series }: { series: ChartSeries[] }) {
-  const drawable = series.filter((s) => s.data.length >= 2);
+  const drawable = series
+    .map((s) => ({ ...s, data: s.data.filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1])) }))
+    .filter((s) => s.data.length >= 2);
   if (drawable.length === 0) return <Text style={styles.chartEmpty}>No data yet.</Text>;
   const xs = drawable.flatMap((s) => s.data.map((p) => p[0]));
   const ys = drawable.flatMap((s) => s.data.map((p) => p[1]));
