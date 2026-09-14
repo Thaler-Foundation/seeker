@@ -22,6 +22,9 @@ jobs:
       - name: Lockfile unchanged by install
         run: git diff --exit-code -- bun.lock package.json
 
+      - name: Lint
+        run: ./node_modules/.bin/eslint .
+
       - name: Typecheck
         run: ./node_modules/.bin/tsc --noEmit
 
