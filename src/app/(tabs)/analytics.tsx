@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { AnalyticsKpis, StrategyBreakdownRow } from '@/lib/contracts';
 import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { dark, tier, radius, spacing } from '@/theme/tokens';
+import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
 
 type AnalyticsResponse = {
   kpis: AnalyticsKpis;
@@ -166,19 +166,50 @@ export default function Analytics() {
   const solPrice = livePrice > 0 ? livePrice : totalTvlSol > 0 ? sumTvlUsd / totalTvlSol : 0;
   const totalPendingUsdcUsd = breakdown.reduce((s, r) => s + num(r.pendingUsdcUsd), 0);
   const totalYieldGenSol = totalYieldSol + (solPrice > 0 ? totalPendingUsdcUsd / solPrice : 0);
-  const KPIS: { label: string; value?: string; node?: ReactNode }[] = [
+  const tvlGrowthUsd = k?.tvl30dGrowthUsd ?? 0;
+  const tvlGrowthPct = k?.tvl30dGrowthPct ?? 0;
+  const tvlSub = !k
+    ? '-'
+    : tvlGrowthPct !== 0
+      ? `${tvlGrowthPct > 0 ? '+' : ''}${tvlGrowthPct.toFixed(2)}% (30d)`
+      : tvlGrowthUsd !== 0
+        ? `${tvlGrowthUsd > 0 ? '+' : '-'}${compactUsd(Math.abs(tvlGrowthUsd))} (30d)`
+        : 'No change (30d)';
+  const tvlNegative = k ? tvlGrowthPct < 0 || (tvlGrowthPct === 0 && tvlGrowthUsd < 0) : false;
+
+  const KPIS: {
+    label: string;
+    value?: string;
+    node?: ReactNode;
+    sub: string;
+    tone: 'positive' | 'negative' | 'muted';
+  }[] = [
     {
       label: 'Total Value Locked',
       node: k ? <SolUsd sol={totalTvlSol} price={solPrice} /> : undefined,
       value: k ? undefined : '-',
+      sub: tvlSub,
+      tone: tvlNegative ? 'negative' : 'positive',
     },
-    { label: 'Protocol Return Rate', value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-' },
+    {
+      label: 'Protocol Return Rate',
+      value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-',
+      sub: 'realized yield over deposit',
+      tone: 'positive',
+    },
     {
       label: 'Yield Generated',
       node: k ? <SolUsd sol={totalYieldGenSol} price={solPrice} /> : undefined,
       value: k ? undefined : '-',
+      sub: 'all-time, all strategies',
+      tone: 'muted',
     },
-    { label: 'Active Vaults', value: k ? String(k.activeVaultCount) : '-' },
+    {
+      label: 'Active Vaults',
+      value: k ? String(k.activeVaultCount) : '-',
+      sub: k ? `+${k.vaults30dDelta} opened this month` : '-',
+      tone: 'positive',
+    },
   ];
 
   const tvlSeries: [number, number][] = (q.data?.tvlDailyUsd ?? [])
@@ -220,6 +251,18 @@ export default function Analytics() {
             <View key={c.label} style={styles.kpi}>
               {c.node ?? <Text style={styles.kpiValue}>{c.value}</Text>}
               <Text style={styles.kpiLabel}>{c.label}</Text>
+              <Text
+                style={[
+                  styles.kpiSub,
+                  c.tone === 'positive'
+                    ? { color: brand.success }
+                    : c.tone === 'negative'
+                      ? { color: brand.error }
+                      : null,
+                ]}
+              >
+                {c.sub}
+              </Text>
             </View>
           ))}
         </View>
@@ -305,6 +348,7 @@ const styles = StyleSheet.create({
   },
   kpiUsd: { fontSize: 11, fontWeight: '400', color: dark.mutedForeground },
   kpiLabel: { color: dark.mutedForeground, fontSize: 12 },
+  kpiSub: { color: dark.mutedForeground, fontSize: 11 },
   list: {
     backgroundColor: dark.card,
     borderColor: dark.border,
