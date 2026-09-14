@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderTopColor: dark.border, borderTopWidth: 1 },
   rowL: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 12, height: 12, borderRadius: 6 },
-  rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
+  rowLabel: { color: dark.foreground, fontSize: 11, fontWeight: '500' },
   rowDetail: { color: dark.mutedForeground, fontSize: 12 },
   rowValue: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'] },
   rowNums: { flex: 3, flexDirection: 'row', gap: 12, alignItems: 'center' },

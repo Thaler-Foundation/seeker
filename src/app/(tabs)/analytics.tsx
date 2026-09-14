@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderTopColor: dark.border, borderTopWidth: 1 },
   rowL: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
+  rowLabel: { color: dark.foreground, fontSize: 11, fontWeight: '500' },
   rowValue: { color: dark.foreground, fontSize: 12, fontVariant: ['tabular-nums'] },
   bdName: { flex: 1.7, minWidth: 0 },
   bdCell: { flex: 1, fontSize: 9, textAlign: 'right' },
