@@ -209,18 +209,37 @@ export default function Analytics() {
           <Text style={[styles.eyebrow, { padding: spacing.base, paddingBottom: 8 }]}>
             STRATEGY BREAKDOWN
           </Text>
-          {breakdown.map((r, i) => {
+          <View style={[styles.row, styles.rowBorder]}>
+            <View style={styles.bdName} />
+            <Text style={[styles.bdHeadCell, styles.bdCell]}>POSITIONS</Text>
+            <Text style={[styles.bdHeadCell, styles.bdCell]}>TVL</Text>
+            <Text style={[styles.bdHeadCell, styles.bdCell]}>APR</Text>
+            <Text style={[styles.bdHeadCell, styles.bdCell]}>YIELD</Text>
+            <Text style={[styles.bdHeadCell, styles.bdCell]}>UTIL</Text>
+          </View>
+          {breakdown.map((r) => {
             const meta = MODE_META[r.mode] ?? MODE_META.A;
+            const aprBps = r.apy30dMedianBps;
+            const pendingSol = solPrice > 0 ? num(r.pendingUsdcUsd) / solPrice : 0;
+            const yieldSol = num(r.lifetimeYieldSol) + pendingSol;
             return (
-              <View key={r.mode} style={[styles.row, i > 0 && styles.rowBorder]}>
-                <View style={styles.rowL}>
+              <View key={r.mode} style={[styles.row, styles.rowBorder]}>
+                <View style={[styles.rowL, styles.bdName]}>
                   <View style={[styles.dot, { backgroundColor: meta.color }]} />
                   <Text style={styles.rowLabel}>{meta.label}</Text>
                 </View>
-                <Text style={styles.rowValue}>
-                  {`${r.vaultCount}  ${compactSol(num(r.tvlSol))} SOL  ${
-                    r.apy30dMedianBps != null ? (r.apy30dMedianBps / 100).toFixed(1) : '-'
-                  }%`}
+                <Text style={[styles.rowValue, styles.bdCell]}>{r.vaultCount}</Text>
+                <Text style={[styles.rowValue, styles.bdCell]}>
+                  {`${compactSol(num(r.tvlSol))} SOL`}
+                </Text>
+                <Text style={[styles.rowValue, styles.bdCell]}>
+                  {aprBps != null ? `${(aprBps / 100).toFixed(1)}%` : '-'}
+                </Text>
+                <Text style={[styles.rowValue, styles.bdCell]}>
+                  {`${compactSol(yieldSol)} SOL`}
+                </Text>
+                <Text style={[styles.rowValue, styles.bdCell]}>
+                  {`${(num(r.utilization) * 100).toFixed(0)}%`}
                 </Text>
               </View>
             );
@@ -276,6 +295,9 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   rowValue: { color: dark.foreground, fontSize: 12, fontVariant: ['tabular-nums'] },
+  bdName: { flex: 1.7, minWidth: 0 },
+  bdCell: { flex: 1, fontSize: 11, textAlign: 'right' },
+  bdHeadCell: { color: dark.mutedForeground, fontSize: 9, letterSpacing: 0.6, fontWeight: '600' },
   soon: { color: dark.mutedForeground, fontSize: 12 },
   chartCard: {
     backgroundColor: dark.card,
