@@ -333,6 +333,17 @@ export default function Portfolio() {
 
         {tab === 'vaults' ? (
           <View style={styles.list}>
+            {rows.length > 0 ? (
+              <View style={styles.row}>
+                <View style={styles.pfName} />
+                <View style={styles.rowNums}>
+                  <Text style={[styles.pfHeadCell, styles.pfCell]}>NET VALUE</Text>
+                  <Text style={[styles.pfHeadCell, styles.pfCell]}>RETURN RATE</Text>
+                  <Text style={[styles.pfHeadCell, styles.pfCell]}>YIELD</Text>
+                  <Text style={[styles.pfHeadCell, styles.pfCell]}>LTV</Text>
+                </View>
+              </View>
+            ) : null}
             {rows.map((r, i) => {
               const v = vaultById.get(r.vaultExecutionId);
               const depositLamports = v ? Number(v.equityLamports) : 0;
@@ -345,9 +356,9 @@ export default function Portfolio() {
                   onPress={() =>
                     router.push(`/vault/${r.tier}?tab=position&vault=${r.vaultExecutionId}`)
                   }
-                  style={[styles.row, i > 0 && styles.rowBorder]}
+                  style={[styles.row, styles.rowBorder]}
                 >
-                  <View style={styles.rowL}>
+                  <View style={[styles.rowL, styles.pfName]}>
                     <View
                       style={[
                         styles.dot,
@@ -357,18 +368,28 @@ export default function Portfolio() {
                     <Text style={styles.rowLabel}>{`${TIER_LABEL[r.tier] ?? 'Safe'} Vault`}</Text>
                   </View>
                   <View style={styles.rowNums}>
-                    <Text style={styles.rowValue}>
+                    <Text style={[styles.rowValue, styles.pfCell]}>
                       {(Number(r.equityNavLamports) / 1e9).toFixed(4)}
                     </Text>
-                    <Text style={[styles.rowValue, { color: roi >= 0 ? brand.success : brand.error }]}>
+                    <Text
+                      style={[
+                        styles.rowValue,
+                        styles.pfCell,
+                        { color: roi >= 0 ? brand.success : brand.error },
+                      ]}
+                    >
                       {`${roi.toFixed(2)}%`}
                     </Text>
                     <Text
-                      style={[styles.rowValue, { color: realized >= 0 ? brand.success : brand.error }]}
+                      style={[
+                        styles.rowValue,
+                        styles.pfCell,
+                        { color: realized >= 0 ? brand.success : brand.error },
+                      ]}
                     >
                       {`${realized >= 0 ? '+' : ''}${(realized / 1e9).toFixed(4)}`}
                     </Text>
-                    <Text style={styles.rowValue}>{`${ltvPct.toFixed(2)}%`}</Text>
+                    <Text style={[styles.rowValue, styles.pfCell]}>{`${ltvPct.toFixed(2)}%`}</Text>
                   </View>
                 </Pressable>
               );
@@ -519,6 +540,9 @@ const styles = StyleSheet.create({
   rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   rowDetail: { color: dark.mutedForeground, fontSize: 12 },
   rowValue: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'] },
-  rowNums: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  rowNums: { flex: 3, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  pfName: { flex: 1.6, minWidth: 0 },
+  pfCell: { flex: 1, fontSize: 11, textAlign: 'right' },
+  pfHeadCell: { color: dark.mutedForeground, fontSize: 9, letterSpacing: 0.6, fontWeight: '600' },
   empty: { padding: spacing.base, gap: 4 },
 });
