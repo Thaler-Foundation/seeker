@@ -71,6 +71,7 @@ export default function Create() {
   const [termsOpen, setTermsOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState<Tier>('safe');
   const [amount, setAmount] = useState(String(minDepositSol('safe')));
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const minSol = minDepositSol(selectedTier);
   const maxSol = maxDepositSol(selectedTier);
@@ -107,10 +108,13 @@ export default function Create() {
         method: 'POST',
         body: JSON.stringify({ perpVenue: 'pacifica' }),
       }),
+    onMutate: () => setActionError(null),
     onSuccess: (r) => {
       setPairId(r.pairId);
       setStage('fund');
     },
+    onError: (e) =>
+      setActionError(e instanceof Error ? e.message : 'Could not create the vault wallet'),
   });
 
   const balance = useQuery({
@@ -132,10 +136,12 @@ export default function Create() {
         method: 'POST',
         body: JSON.stringify({ pairId, equityLamports, tier: selectedTier }),
       }),
+    onMutate: () => setActionError(null),
     onSuccess: (r) => {
       setExecutionId(r.executionId);
       setStage('open');
     },
+    onError: (e) => setActionError(e instanceof Error ? e.message : 'Could not open the vault'),
   });
 
   const openState = useQuery({
@@ -269,6 +275,9 @@ export default function Create() {
                 {createWallets.isPending ? 'Preparing...' : `Open Vault · ${depositSol} SOL`}
               </Text>
             </Pressable>
+            {actionError ? (
+              <Text style={[styles.mutedSm, { color: brand.error }]}>{actionError}</Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -354,6 +363,9 @@ export default function Create() {
                 {openVault.isPending ? 'Opening...' : 'Open vault'}
               </Text>
             </Pressable>
+            {actionError ? (
+              <Text style={[styles.mutedSm, { color: brand.error }]}>{actionError}</Text>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               disabled={openVault.isPending}
