@@ -1,7 +1,15 @@
 // Portfolio: KPIs, vault rows, transaction history.
 
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Share, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Share,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Polyline } from 'react-native-svg';
@@ -58,6 +66,15 @@ const TIER_LABEL: Record<string, string> = {
   yolo: 'YOLO',
 };
 
+const PF_COLUMNS = [
+  { label: 'NET VALUE', flex: 1.1 },
+  { label: 'RETURN RATE', flex: 1.06 },
+  { label: 'YIELD', flex: 0.97 },
+  { label: 'LTV', flex: 0.88 },
+] as const;
+
+const ACH = (scale: number) => ({ fontSize: 8 * scale, letterSpacing: 0.4 * scale });
+
 function rel(ts: number): string {
   const d = Date.now() - ts;
   const h = Math.floor(d / 3_600_000);
@@ -68,6 +85,9 @@ function rel(ts: number): string {
 
 export default function Portfolio() {
   const router = useRouter();
+  // Table type and spacing scale with the row width, floored so it never reaches 0.
+  const { width } = useWindowDimensions();
+  const scale = Math.max(0.6, Math.min(1, (width - 66) / 346));
   const { getToken, authenticated } = useAuth();
   const [tab, setTab] = useState<'vaults' | 'transactions'>('vaults');
   const [range, setRange] = useState<RangeKey>('7D');
@@ -336,11 +356,19 @@ export default function Portfolio() {
             {rows.length > 0 ? (
               <View style={styles.row}>
                 <View style={styles.pfName} />
-                <View style={styles.rowNums}>
-                  <Text style={[styles.pfHeadCell, styles.pfCell]}>NET VALUE</Text>
-                  <Text style={[styles.pfHeadCell, styles.pfCell]}>RETURN RATE</Text>
-                  <Text style={[styles.pfHeadCell, styles.pfCell]}>YIELD</Text>
-                  <Text style={[styles.pfHeadCell, styles.pfCell]}>LTV</Text>
+                <View style={[styles.rowNums, { gap: 8 * scale }]}>
+                  {PF_COLUMNS.map((c) => (
+                    <Text
+                      key={c.label}
+                      style={[
+                        { flex: c.flex, textAlign: 'right' },
+                        styles.pfHeadCell,
+                        { fontSize: 7 * scale, letterSpacing: 0.4 * scale },
+                      ]}
+                    >
+                      {c.label}
+                    </Text>
+                  ))}
                 </View>
               </View>
             ) : null}
@@ -358,23 +386,31 @@ export default function Portfolio() {
                   }
                   style={[styles.row, styles.rowBorder]}
                 >
-                  <View style={[styles.rowL, styles.pfName]}>
+                  <View style={[styles.rowL, styles.pfName, { gap: 10 * scale }]}>
                     <View
                       style={[
                         styles.dot,
-                        { backgroundColor: (tier as Record<string, string>)[r.tier] ?? tier.safe },
+                        {
+                          backgroundColor: (tier as Record<string, string>)[r.tier] ?? tier.safe,
+                          width: 12 * scale,
+                          height: 12 * scale,
+                          borderRadius: 6 * scale,
+                        },
                       ]}
                     />
-                    <Text style={styles.rowLabel}>{`${TIER_LABEL[r.tier] ?? 'Safe'} Vault`}</Text>
+                    <Text style={[styles.rowLabel, { fontSize: 11 * scale }]}>
+                      {`${TIER_LABEL[r.tier] ?? 'Safe'} Vault`}
+                    </Text>
                   </View>
-                  <View style={styles.rowNums}>
-                    <Text style={[styles.rowValue, styles.pfCell]}>
+                  <View style={[styles.rowNums, { gap: 8 * scale }]}>
+                    <Text style={[styles.rowValue, styles.pfCellVal, { flex: PF_COLUMNS[0]!.flex, fontSize: 11 * scale }]}>
                       {(Number(r.equityNavLamports) / 1e9).toFixed(4)}
                     </Text>
                     <Text
                       style={[
                         styles.rowValue,
-                        styles.pfCell,
+                        styles.pfCellVal,
+                        { flex: PF_COLUMNS[1]!.flex, fontSize: 11 * scale },
                         { color: roi >= 0 ? brand.success : brand.error },
                       ]}
                     >
@@ -383,13 +419,16 @@ export default function Portfolio() {
                     <Text
                       style={[
                         styles.rowValue,
-                        styles.pfCell,
+                        styles.pfCellVal,
+                        { flex: PF_COLUMNS[2]!.flex, fontSize: 11 * scale },
                         { color: realized >= 0 ? brand.success : brand.error },
                       ]}
                     >
                       {`${realized >= 0 ? '+' : ''}${(realized / 1e9).toFixed(4)}`}
                     </Text>
-                    <Text style={[styles.rowValue, styles.pfCell]}>{`${ltvPct.toFixed(2)}%`}</Text>
+                    <Text style={[styles.rowValue, styles.pfCellVal, { flex: PF_COLUMNS[3]!.flex, fontSize: 11 * scale }]}>
+                      {`${ltvPct.toFixed(2)}%`}
+                    </Text>
                   </View>
                 </Pressable>
               );
@@ -407,27 +446,32 @@ export default function Portfolio() {
           <View style={styles.list}>
             {(history.data ?? []).length > 0 ? (
               <View style={styles.row}>
-                <Text style={[styles.acDate, styles.acHeadCell]}>DATE</Text>
-                <Text style={[styles.acType, styles.acHeadCell]}>TYPE</Text>
-                <Text style={[styles.acDetail, styles.acHeadCell]}>DETAIL</Text>
-                <Text style={[styles.acAmount, styles.acHeadCell]}>AMOUNT</Text>
+                <Text style={[styles.acDate, styles.acHeadCell, ACH(scale)]}>DATE</Text>
+                <Text style={[styles.acType, styles.acHeadCell, ACH(scale)]}>TYPE</Text>
+                <Text style={[styles.acDetail, styles.acHeadCell, ACH(scale)]}>DETAIL</Text>
+                <Text style={[styles.acAmount, styles.acHeadCell, ACH(scale)]}>AMOUNT</Text>
               </View>
             ) : null}
             {(history.data ?? []).map((r) => (
               <View key={r.id} style={[styles.row, styles.rowBorder]}>
-                <Text style={[styles.rowDetail, styles.acDate]} numberOfLines={1}>
+                <Text style={[styles.rowDetail, styles.acDate, { fontSize: 11 * scale }]}>
                   {rel(r.ts)}
                 </Text>
                 <View style={styles.acType}>
-                  <View style={styles.typeBadge}>
-                    <Text style={styles.typeBadgeLabel}>{r.interaction}</Text>
+                  <View style={[styles.typeBadge, { paddingHorizontal: 8 * scale }]}>
+                    <Text style={[styles.typeBadgeLabel, { fontSize: 11 * scale }]}>
+                      {r.interaction}
+                    </Text>
                   </View>
                 </View>
-                <Text style={[styles.rowDetail, styles.acDetail]}>{r.detail}</Text>
+                <Text style={[styles.rowDetail, styles.acDetail, { fontSize: 11 * scale }]}>
+                  {r.detail}
+                </Text>
                 <Text
                   style={[
                     styles.rowValue,
                     styles.acAmount,
+                    { fontSize: 11 * scale },
                     r.amount.startsWith('+') && { color: brand.success },
                   ]}
                 >
@@ -544,17 +588,17 @@ const styles = StyleSheet.create({
   rowBorder: { borderTopColor: dark.border, borderTopWidth: 1 },
   rowL: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 12, height: 12, borderRadius: 6 },
-  rowLabel: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
+  rowLabel: { color: dark.foreground, fontSize: 11, fontWeight: '500' },
   rowDetail: { color: dark.mutedForeground, fontSize: 12 },
   rowValue: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'] },
   rowNums: { flex: 3, flexDirection: 'row', gap: 12, alignItems: 'center' },
   pfName: { flex: 1.6, minWidth: 0 },
-  pfCell: { flex: 1, fontSize: 11, textAlign: 'right' },
-  pfHeadCell: { color: dark.mutedForeground, fontSize: 9, letterSpacing: 0.6, fontWeight: '600' },
-  acHeadCell: { color: dark.mutedForeground, fontSize: 11, letterSpacing: 0.6, fontWeight: '600' },
-  acDate: { flex: 0.6, fontSize: 11 },
-  acType: { flex: 1.2 },
-  acDetail: { flex: 1.4, fontSize: 11 },
-  acAmount: { flex: 0.95, fontSize: 11, textAlign: 'right' },
+  pfCellVal: { fontSize: 11, textAlign: 'right' },
+  pfHeadCell: { color: dark.mutedForeground, fontSize: 7, letterSpacing: 0.4, fontWeight: '600' },
+  acHeadCell: { color: dark.mutedForeground, fontSize: 8, letterSpacing: 0.4, fontWeight: '600' },
+  acDate: { flex: 0.67, fontSize: 11 },
+  acType: { flex: 1.29 },
+  acDetail: { flex: 0.94, fontSize: 11 },
+  acAmount: { flex: 1.1, fontSize: 11, textAlign: 'right' },
   empty: { padding: spacing.base, gap: 4 },
 });

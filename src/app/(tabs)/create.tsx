@@ -369,7 +369,10 @@ export default function Create() {
             <Pressable
               accessibilityRole="button"
               disabled={openVault.isPending}
-              onPress={() => setStage('configure')}
+              onPress={() => {
+                setActionError(null);
+                setStage('configure');
+              }}
               style={styles.backBtn}
             >
               <Text style={styles.backLabel}>Back</Text>

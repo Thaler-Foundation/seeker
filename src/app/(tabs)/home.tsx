@@ -1,7 +1,7 @@
 // Home: vaults grid with live stats from /api/stats.
 
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -27,6 +27,9 @@ function formatTvl(usd: number): string {
 
 export default function Home() {
   const router = useRouter();
+  // Table type and spacing scale with the row width, floored so it never reaches 0.
+  const { width } = useWindowDimensions();
+  const scale = Math.max(0.6, Math.min(1, (width - 66) / 346));
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const stats = useQuery({
     queryKey: ['public-stats'],
@@ -115,10 +118,14 @@ export default function Home() {
         <View style={styles.list}>
           <View style={styles.row}>
             <View style={styles.hmName}>
-              <Text style={styles.hmHeadCell}>VAULT</Text>
+              <Text style={[styles.hmHeadCell, { fontSize: 8 * scale, letterSpacing: 0.4 * scale }]}>VAULT</Text>
             </View>
-            <Text style={[styles.hmHeadCell, styles.hmCell]}>PROJECTED APR</Text>
-            <Text style={[styles.hmHeadCell, styles.hmCell]}>DEPOSITED</Text>
+            <Text style={[styles.hmCell, styles.hmHeadCell, { fontSize: 8 * scale, letterSpacing: 0.4 * scale }]}>
+              PROJECTED APR
+            </Text>
+            <Text style={[styles.hmCell, styles.hmHeadCell, { fontSize: 8 * scale, letterSpacing: 0.4 * scale }]}>
+              DEPOSITED
+            </Text>
           </View>
           {TIERS.map((t) => {
             const apr = aprForMode(t.mode);
@@ -129,14 +136,19 @@ export default function Home() {
                 onPress={() => router.push(`/vault/${t.key}`)}
                 style={[styles.row, styles.rowBorder]}
               >
-                <View style={[styles.rowLeft, styles.hmName]}>
-                  <View style={[styles.dot, { backgroundColor: t.color }]} />
-                  <Text style={styles.rowLabel}>{t.label} Vault</Text>
+                <View style={[styles.rowLeft, styles.hmName, { gap: 10 * scale }]}>
+                  <View
+                    style={[
+                      styles.dot,
+                      { backgroundColor: t.color, width: 12 * scale, height: 12 * scale, borderRadius: 6 * scale },
+                    ]}
+                  />
+                  <Text style={[styles.rowLabel, { fontSize: 14 * scale }]}>{t.label} Vault</Text>
                 </View>
-                <Text style={[styles.rowValue, styles.hmCell]}>
+                <Text style={[styles.rowValue, styles.hmCell, { fontSize: 12 * scale }]}>
                   {apr != null ? `${apr.toFixed(2)}%` : '-'}
                 </Text>
-                <Text style={[styles.rowValue, styles.hmCell]}>
+                <Text style={[styles.rowValue, styles.hmCell, { fontSize: 12 * scale }]}>
                   {dep != null ? `${Math.round(dep).toLocaleString()} SOL` : '-'}
                 </Text>
               </Pressable>
@@ -211,6 +223,6 @@ const styles = StyleSheet.create({
   rowValue: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'] },
   hmName: { flex: 2, minWidth: 0 },
   hmCell: { flex: 1, fontSize: 12, textAlign: 'right' },
-  hmHeadCell: { color: dark.mutedForeground, fontSize: 9, letterSpacing: 0.6, fontWeight: '600' },
+  hmHeadCell: { color: dark.mutedForeground, fontSize: 8, letterSpacing: 0.4, fontWeight: '600' },
   soon: { color: dark.mutedForeground, fontSize: 12 },
 });
