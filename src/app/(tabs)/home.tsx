@@ -1,7 +1,15 @@
 // Home: vaults grid with live stats from /api/stats.
 
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  PixelRatio,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -27,9 +35,10 @@ function formatTvl(usd: number): string {
 
 export default function Home() {
   const router = useRouter();
-  // Table type and spacing scale with the row width, floored so it never reaches 0.
+  // Table type scales with the row width and divides out any OS font enlargement.
   const { width } = useWindowDimensions();
-  const scale = Math.max(0.6, Math.min(1, (width - 66) / 346));
+  const scale =
+    Math.max(0.6, Math.min(1, (width - 66) / 346)) / Math.max(1, PixelRatio.getFontScale());
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const stats = useQuery({
     queryKey: ['public-stats'],

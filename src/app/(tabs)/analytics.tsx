@@ -1,7 +1,14 @@
 // Analytics: protocol KPIs and strategy breakdown from /v1/analytics.
 
 import { type ReactNode } from 'react';
-import { View, Text, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  PixelRatio,
+  useWindowDimensions,
+} from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -52,7 +59,9 @@ function SolUsd({ sol, price }: { sol: number; price: number }) {
 type ChartSeries = { label: string; color: string; data: [number, number][] };
 
 function MiniChart({ series }: { series: ChartSeries[] }) {
-  const drawable = series.filter((s) => s.data.length >= 2);
+  const drawable = series
+    .map((s) => ({ ...s, data: s.data.filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1])) }))
+    .filter((s) => s.data.length >= 2);
   if (drawable.length === 0) return <Text style={styles.chartEmpty}>No data yet.</Text>;
   const xs = drawable.flatMap((s) => s.data.map((p) => p[0]));
   const ys = drawable.flatMap((s) => s.data.map((p) => p[1]));
@@ -142,9 +151,10 @@ function AllocList({
 }
 
 export default function Analytics() {
-  // Table type and spacing scale with the row width, floored so it never reaches 0.
+  // Table type scales with the row width and divides out any OS font enlargement.
   const { width } = useWindowDimensions();
-  const scale = Math.max(0.6, Math.min(1, (width - 66) / 346));
+  const scale =
+    Math.max(0.6, Math.min(1, (width - 66) / 346)) / Math.max(1, PixelRatio.getFontScale());
   const { getToken, authenticated } = useAuth();
   const q = useQuery({
     queryKey: ['analytics'],

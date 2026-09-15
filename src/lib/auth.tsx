@@ -85,6 +85,7 @@ function InnerAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!email) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGate('error');
       setGateError('No verified email on this Privy account. Sign out and try again.');
       return;

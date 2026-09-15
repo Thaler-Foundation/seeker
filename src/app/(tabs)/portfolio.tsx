@@ -8,6 +8,7 @@ import {
   Pressable,
   Share,
   StyleSheet,
+  PixelRatio,
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -85,9 +86,10 @@ function rel(ts: number): string {
 
 export default function Portfolio() {
   const router = useRouter();
-  // Table type and spacing scale with the row width, floored so it never reaches 0.
+  // Table type scales with the row width and divides out any OS font enlargement.
   const { width } = useWindowDimensions();
-  const scale = Math.max(0.6, Math.min(1, (width - 66) / 346));
+  const scale =
+    Math.max(0.6, Math.min(1, (width - 66) / 346)) / Math.max(1, PixelRatio.getFontScale());
   const { getToken, authenticated } = useAuth();
   const [tab, setTab] = useState<'vaults' | 'transactions'>('vaults');
   const [range, setRange] = useState<RangeKey>('7D');
@@ -192,6 +194,7 @@ export default function Portfolio() {
     staleTime: 60_000,
   });
   const rangeDays = RANGES.find((r) => r.key === range)!.days;
+  // eslint-disable-next-line react-hooks/purity
   const cutoff = Date.now() - rangeDays * 86_400_000;
   const pts = (equity.data?.points ?? [])
     .map((p) => [Date.parse(p.date), p.equitySol] as const)
@@ -591,7 +594,7 @@ const styles = StyleSheet.create({
   rowLabel: { color: dark.foreground, fontSize: 11, fontWeight: '500' },
   rowDetail: { color: dark.mutedForeground, fontSize: 12 },
   rowValue: { color: dark.foreground, fontSize: 13, fontVariant: ['tabular-nums'] },
-  rowNums: { flex: 3, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  rowNums: { flex: 3, flexDirection: 'row', gap: 8, alignItems: 'center' },
   pfName: { flex: 1.6, minWidth: 0 },
   pfCellVal: { fontSize: 11, textAlign: 'right' },
   pfHeadCell: { color: dark.mutedForeground, fontSize: 7, letterSpacing: 0.4, fontWeight: '600' },
