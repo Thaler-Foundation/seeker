@@ -1,21 +1,23 @@
-// Analytics: protocol KPIs and strategy breakdown from /v1/analytics.
-
-import { type ReactNode } from 'react';
+import { InteractiveChart } from '@/components/chart/interactive-chart';
+import { SidebarTrigger } from '@/components/sidebar/sidebar-trigger';
+import { endpoints, fetchThaler, type PublicStats } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import type { AnalyticsKpis, StrategyBreakdownRow } from '@/lib/contracts';
+import { brand, dark, dock, glass, radius, spacing, tier } from '@/theme/tokens';
+import { typography } from '@/theme/typography';
+import { useQuery } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
+import { type ReactNode, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
+  PixelRatio,
+  Pressable,
   ScrollView,
   StyleSheet,
-  PixelRatio,
+  Text,
   useWindowDimensions,
+  View,
 } from 'react-native';
-import Svg, { Polyline } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
-import type { AnalyticsKpis, StrategyBreakdownRow } from '@/lib/contracts';
-import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
-import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
 
 type AnalyticsResponse = {
   kpis: AnalyticsKpis;
@@ -34,6 +36,13 @@ const MODE_META: Record<string, { label: string; color: string }> = {
   E: { label: 'Aggressive', color: tier.aggressive },
   F: { label: 'YOLO', color: tier.yolo },
 };
+
+const CHART_RANGES = [
+  { key: '7D', days: 7 },
+  { key: '30D', days: 30 },
+  { key: '3M', days: 90 },
+] as const;
+type ChartRangeKey = (typeof CHART_RANGES)[number]['key'];
 
 function compactUsd(v: number): string {
   if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
@@ -56,68 +65,40 @@ function SolUsd({ sol, price }: { sol: number; price: number }) {
   );
 }
 
-type ChartSeries = { label: string; color: string; data: [number, number][] };
 
-function MiniChart({ series }: { series: ChartSeries[] }) {
-  const drawable = series
-    .map((s) => ({ ...s, data: s.data.filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1])) }))
-    .filter((s) => s.data.length >= 2);
-  if (drawable.length === 0) return <Text style={styles.chartEmpty}>No data yet.</Text>;
-  const xs = drawable.flatMap((s) => s.data.map((p) => p[0]));
-  const ys = drawable.flatMap((s) => s.data.map((p) => p[1]));
-  const x0 = Math.min(...xs);
-  const spanX = Math.max(...xs) - x0 || 1;
-  const yMin = Math.min(...ys);
-  const spanY = Math.max(...ys) - yMin || 1;
-  return (
-    <Svg width="100%" height={120} viewBox="0 0 100 40" preserveAspectRatio="none">
-      {drawable.map((s) => (
-        <Polyline
-          key={s.label}
-          points={s.data
-            .map(
-              ([x, y]) =>
-                `${(((x - x0) / spanX) * 100).toFixed(2)},${(1 + (1 - (y - yMin) / spanY) * 38).toFixed(2)}`
-            )
-            .join(' ')}
-          fill="none"
-          stroke={s.color}
-          strokeWidth={0.7}
-          strokeLinejoin="round"
-        />
-      ))}
-    </Svg>
-  );
+type ColorConfig =
+  | { type: 'solid'; color: string }
+  | { type: 'gradient'; colors: [string, string]; start?: { x: number; y: number }; end?: { x: number; y: number } };
+
+const FALLBACK_COLOR: ColorConfig = { type: 'solid', color: '#6b7280' };
+
+function AllocDot({ config }: { config: ColorConfig }) {
+  if (config.type === 'gradient') {
+    return (
+      <LinearGradient
+        colors={config.colors}
+        start={config.start ?? { x: 0, y: 0 }}
+        end={config.end ?? { x: 1, y: 0 }}
+        style={styles.dot}
+      />
+    );
+  }
+  return <View style={[styles.dot, { backgroundColor: config.color }]} />;
 }
 
-function ChartCard({
-  title,
-  sub,
-  series,
-  legend,
-}: {
-  title: string;
-  sub: string;
-  series: ChartSeries[];
-  legend?: boolean;
-}) {
-  return (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartTitle}>{title}</Text>
-      <Text style={styles.chartSub}>{sub}</Text>
-      <MiniChart series={series} />
-      {legend ? (
-        <View style={styles.legend}>
-          {series.map((s) => (
-            <View key={s.label} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: s.color }]} />
-              <Text style={styles.legendLabel}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
+function AllocBar({ config, pct }: { config: ColorConfig; pct: number }) {
+  const width = `${Math.min(100, pct)}%` as const;
+  if (config.type === 'gradient') {
+    return (
+      <LinearGradient
+        colors={config.colors}
+        start={config.start ?? { x: 0, y: 0 }}
+        end={config.end ?? { x: 1, y: 0 }}
+        style={[styles.allocBarFill, { width }]}
+      />
+    );
+  }
+  return <View style={[styles.allocBarFill, { width, backgroundColor: config.color }]} />;
 }
 
 function AllocList({
@@ -125,7 +106,7 @@ function AllocList({
   rows,
 }: {
   title: string;
-  rows: { name: string; pct: number; color: string }[];
+  rows: { name: string; pct: number; colorConfig: ColorConfig }[];
 }) {
   return (
     <View style={styles.allocBlock}>
@@ -134,13 +115,11 @@ function AllocList({
         <Text style={styles.soon}>No active positions yet.</Text>
       ) : (
         rows.map((r) => (
-          <View key={r.name} style={styles.allocRow}>
-            <View style={[styles.dot, { backgroundColor: r.color }]} />
+          <View key={r.name} style={[styles.allocRow, r.pct === 0 && { opacity: 0.3 }]}>
+            <AllocDot config={r.pct === 0 ? FALLBACK_COLOR : r.colorConfig} />
             <Text style={styles.allocName}>{r.name}</Text>
             <View style={styles.allocBarTrack}>
-              <View
-                style={[styles.allocBarFill, { width: `${Math.min(100, r.pct)}%`, backgroundColor: r.color }]}
-              />
+              <AllocBar config={r.pct === 0 ? FALLBACK_COLOR : r.colorConfig} pct={r.pct} />
             </View>
             <Text style={styles.allocPct}>{r.pct}%</Text>
           </View>
@@ -151,17 +130,21 @@ function AllocList({
 }
 
 export default function Analytics() {
-  // Table type scales with the row width and divides out any OS font enlargement.
   const { width } = useWindowDimensions();
   const scale =
     Math.max(0.6, Math.min(1, (width - 66) / 346)) / Math.max(1, PixelRatio.getFontScale());
   const { getToken, authenticated } = useAuth();
+
+  const [tvlRange, setTvlRange] = useState<ChartRangeKey>('30D');
+  const [aprRange, setAprRange] = useState<ChartRangeKey>('30D');
+  const [selectedMode, setSelectedMode] = useState<string | null>('A');
+
   const q = useQuery({
     queryKey: ['analytics'],
     queryFn: async () =>
       fetchThaler<AnalyticsResponse>(await getToken(), endpoints.analytics),
     enabled: authenticated,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
   const pub = useQuery({
     queryKey: ['public-stats'],
@@ -197,47 +180,72 @@ export default function Analytics() {
     sub: string;
     tone: 'positive' | 'negative' | 'muted';
   }[] = [
-    {
-      label: 'Total Value Locked',
-      node: k ? <SolUsd sol={totalTvlSol} price={solPrice} /> : undefined,
-      value: k ? undefined : '-',
-      sub: tvlSub,
-      tone: tvlNegative ? 'negative' : 'positive',
-    },
-    {
-      label: 'Protocol Return Rate',
-      value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-',
-      sub: 'realized yield over deposit',
-      tone: 'positive',
-    },
-    {
-      label: 'Yield Generated',
-      node: k ? <SolUsd sol={totalYieldGenSol} price={solPrice} /> : undefined,
-      value: k ? undefined : '-',
-      sub: 'all-time, all strategies',
-      tone: 'muted',
-    },
-    {
-      label: 'Active Vaults',
-      value: k ? String(k.activeVaultCount) : '-',
-      sub: k ? `+${k.vaults30dDelta} opened this month` : '-',
-      tone: 'positive',
-    },
-  ];
+      {
+        label: 'Total Value Locked',
+        node: k ? <SolUsd sol={totalTvlSol} price={solPrice} /> : undefined,
+        value: k ? undefined : '-',
+        sub: tvlSub,
+        tone: tvlNegative ? 'negative' : 'positive',
+      },
+      {
+        label: 'Protocol Return Rate',
+        value: k && k.roiPct != null ? `${k.roiPct.toFixed(2)}%` : '-',
+        sub: 'realized yield over deposit',
+        tone: 'positive',
+      },
+      {
+        label: 'Yield Generated',
+        node: k ? <SolUsd sol={totalYieldGenSol} price={solPrice} /> : undefined,
+        value: k ? undefined : '-',
+        sub: 'all-time, all strategies',
+        tone: 'muted',
+      },
+      {
+        label: 'Active Vaults',
+        value: k ? String(k.activeVaultCount) : '-',
+        sub: k ? `+${k.vaults30dDelta} opened this month` : '-',
+        tone: 'positive',
+      },
+    ];
 
-  const tvlSeries: [number, number][] = (q.data?.tvlDailyUsd ?? [])
-    .filter((p) => p.tvlUsd > 0)
-    .map((p) => [Date.parse(p.date), solPrice > 0 ? p.tvlUsd / solPrice : 0] as [number, number])
-    .sort((a, b) => a[0] - b[0]);
-  const aprSeries: ChartSeries[] = Object.entries(MODE_META).map(([mode, meta]) => ({
-    label: meta.label,
+  const [now] = useState(() => Date.now());
+
+  const tvlCutoff = useMemo(
+    () => now - (CHART_RANGES.find((r) => r.key === tvlRange)?.days ?? 30) * 86_400_000,
+    [now, tvlRange],
+  );
+  const tvlChartData = useMemo(
+    () =>
+      (q.data?.tvlDailyUsd ?? [])
+        .filter((p) => p.tvlUsd > 0 && Date.parse(p.date) >= tvlCutoff)
+        .map((p) => ({ timestamp: Date.parse(p.date), value: solPrice > 0 ? p.tvlUsd / solPrice : 0 }))
+        .sort((a, b) => a.timestamp - b.timestamp),
+    [q.data?.tvlDailyUsd, tvlCutoff, solPrice],
+  );
+
+  const aprCutoff = useMemo(
+    () => now - (CHART_RANGES.find((r) => r.key === aprRange)?.days ?? 30) * 86_400_000,
+    [now, aprRange],
+  );
+
+  const allAprSeries = Object.entries(MODE_META).map(([key, meta]) => ({
+    key,
     color: meta.color,
     data: (q.data?.apyByModeDaily ?? [])
-      .filter((p) => p.mode === mode)
-      .map((p) => [Date.parse(p.date), p.apyBps / 100] as [number, number])
-      .sort((a, b) => a[0] - b[0]),
+      .filter((p) => p.mode === key && Date.parse(p.date) >= aprCutoff)
+      .map((p) => ({ timestamp: Date.parse(p.date), value: p.apyBps / 100 }))
+      .sort((a, b) => a.timestamp - b.timestamp),
   }));
-  // Latest point of each mode's APR series, the value the chart above plots.
+
+  const aprChartData = selectedMode
+    ? allAprSeries.find((s) => s.key === selectedMode)?.data
+    : undefined;
+  const selectedModeMeta = selectedMode ? MODE_META[selectedMode] : null;
+
+  const aprOverlaySeries = allAprSeries
+    .filter((s) => s.data.length >= 2)
+    .map((s) => ({ data: s.data, color: 'rgba(255,255,255,0.22)' }));
+
   const latestAprBpsByMode: Record<string, number> = {};
   const latestAprDateByMode: Record<string, number> = {};
   for (const p of q.data?.apyByModeDaily ?? []) {
@@ -247,23 +255,54 @@ export default function Analytics() {
       latestAprBpsByMode[p.mode] = p.apyBps;
     }
   }
-  const ASSET_COLOR: Record<string, string> = { jitoSOL: '#4ADE80', mSOL: '#166534', SOL: '#9945FF' };
-  const VENUE_COLOR: Record<string, string> = { hyperliquid: '#50E3C2', pacifica: '#3B7BBE', kamino: '#00BCD4' };
-  const assetRows = (q.data?.assetAllocation ?? []).map((a) => ({
-    name: a.name,
-    pct: a.pct,
-    color: ASSET_COLOR[a.name] ?? '#6b7280',
-  }));
-  const venueRows = (q.data?.venueAllocation ?? []).map((v) => ({
-    name: v.venue.charAt(0).toUpperCase() + v.venue.slice(1),
-    pct: v.pct,
-    color: VENUE_COLOR[v.venue.toLowerCase()] ?? '#6b7280',
-  }));
+
+  const ASSET_COLOR: Record<string, ColorConfig> = {
+    jupsol:     { type: 'solid',    color: '#c7f284' },
+    jitosol:    { type: 'gradient', colors: ['#7ed588', '#3f9d7d'] },
+    msol:       { type: 'solid',    color: '#c8ece1' },
+    inf:        { type: 'gradient', colors: ['#9b5de5', '#4dc9f7'] },
+    psol:       { type: 'solid',    color: '#9685e2' },
+    stkesol:    { type: 'gradient', colors: ['#c350f0', '#ff6b35'] },
+    lanternsol: { type: 'solid',    color: '#faca02' },
+    hsol:       { type: 'solid',    color: '#e84326' },
+    bsol:       { type: 'solid',    color: '#6ee9fa' },
+  };
+  const VENUE_COLOR: Record<string, ColorConfig> = {
+    kamino:   { type: 'solid', color: '#b8dce6' },
+    pacifica: { type: 'solid', color: '#53bde2' },
+    jupiter:  { type: 'solid', color: '#c7f284' },
+    phoenix:  { type: 'solid', color: '#ff9a47' },
+    bulk:     { type: 'solid', color: '#fffeef' },
+  };
+
+  const normaliseKey = (s: string) => s.toLowerCase().replace(/[_-]/g, '');
+  const assetRows = (q.data?.assetAllocation ?? [])
+    .map((a) => ({
+      name: a.name,
+      pct: a.pct,
+      colorConfig: ASSET_COLOR[normaliseKey(a.name)] ?? FALLBACK_COLOR,
+    }))
+    .sort((a, b) => b.pct - a.pct);
+  const venueRows = (q.data?.venueAllocation ?? [])
+    .map((v) => ({
+      name: v.venue.charAt(0).toUpperCase() + v.venue.slice(1),
+      pct: v.pct,
+      colorConfig: VENUE_COLOR[v.venue.toLowerCase()] ?? FALLBACK_COLOR,
+    }))
+    .sort((a, b) => b.pct - a.pct);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.h1}>Analytics</Text>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: dock.height + 40 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headRow}>
+          <View style={styles.headLeft}>
+            <SidebarTrigger />
+            <Text style={styles.h1}>Analytics</Text>
+          </View>
+        </View>
         <Text style={styles.hint}>
           Across all Thaler vaults. Every figure aggregates positions opened by every user on the
           protocol.
@@ -289,12 +328,74 @@ export default function Analytics() {
             </View>
           ))}
         </View>
-        <ChartCard
-          title="Total Value Locked"
-          sub="protocol tvl in sol"
-          series={[{ label: 'TVL', color: '#9945FF', data: tvlSeries }]}
-        />
-        <ChartCard title="Projected APR" sub="per strategy tier" series={aprSeries} legend />
+        <View style={styles.chartCard}>
+          <Text style={styles.chartTitle}>Total Value Locked</Text>
+          <Text style={styles.chartSub}>protocol tvl in sol</Text>
+          <InteractiveChart
+            data={tvlChartData.length >= 2 ? tvlChartData : undefined}
+            color="#9945FF"
+            gradientColor="#9945FF"
+            height={160}
+            timeframes={CHART_RANGES.map((r) => r.key)}
+            initialTimeframe={tvlRange}
+            activeTimeframe={tvlRange}
+            onTimeframeChange={(tf) => setTvlRange(tf as ChartRangeKey)}
+            formatValue={(v) => `${compactSol(v)} SOL`}
+            showHeader={true}
+            emptyMessage="No TVL data yet."
+          />
+        </View>
+
+        <View style={styles.chartCard}>
+          <Text style={styles.chartTitle}>Projected APR</Text>
+          <Text style={styles.chartSub}>per strategy tier — tap a tier to highlight</Text>
+          <InteractiveChart
+            data={aprChartData && aprChartData.length >= 2 ? aprChartData : undefined}
+            seriesOverlay={aprOverlaySeries}
+            color={selectedModeMeta?.color ?? '#9945FF'}
+            gradientColor={selectedModeMeta?.color ?? '#9945FF'}
+            height={160}
+            timeframes={CHART_RANGES.map((r) => r.key)}
+            initialTimeframe={aprRange}
+            activeTimeframe={aprRange}
+            onTimeframeChange={(tf) => setAprRange(tf as ChartRangeKey)}
+            formatValue={(v) => `${v.toFixed(2)}%`}
+            showHeader={selectedMode !== null}
+            emptyMessage="No APR data available yet."
+          />
+          <View style={styles.modeSelectorRow}>
+            {Object.entries(MODE_META).map(([key, meta]) => {
+              const active = selectedMode === key;
+              return (
+                <Pressable
+                  key={key}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  onPress={() => setSelectedMode(active ? null : key)}
+                  style={[
+                    styles.modePill,
+                    active && { backgroundColor: `${meta.color}22`, borderColor: `${meta.color}66` },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.modeDot,
+                      { backgroundColor: active ? meta.color : dark.mutedForeground },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.modeLabel,
+                      { color: active ? meta.color : dark.mutedForeground },
+                    ]}
+                  >
+                    {meta.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
         <View style={styles.list}>
           <AllocList title="ASSET ALLOCATION" rows={assetRows} />
           <View style={styles.allocDivider} />
@@ -365,15 +466,26 @@ export default function Analytics() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: dark.background },
   scroll: { padding: spacing.base, gap: spacing.base },
-  eyebrow: { color: dark.mutedForeground, fontSize: 10, letterSpacing: 1.4, fontWeight: '600' },
-  h1: { color: dark.foreground, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  hint: { color: dark.mutedForeground, fontSize: 13 },
+  headRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  headLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  eyebrow: { ...typography.captionBold, color: dark.mutedForeground, letterSpacing: 1.2 },
+  h1: { ...typography.title1, color: dark.foreground, fontSize: 28 },
+  hint: { ...typography.body, color: dark.mutedForeground, fontSize: 13 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   kpi: {
     flexGrow: 1,
     minWidth: '45%',
-    backgroundColor: dark.card,
-    borderColor: dark.border,
+    backgroundColor: glass.bg,
+    borderColor: glass.border,
     borderWidth: 1,
     borderRadius: radius.xl,
     paddingVertical: spacing.lg,
@@ -381,13 +493,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   kpiValue: {
+    ...typography.monoLg,
     color: dark.foreground,
-    fontSize: 19,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
+    fontSize: 20,
+    lineHeight: 24,
   },
-  kpiUsd: { fontSize: 11, fontWeight: '400', color: dark.mutedForeground },
-  kpiLabel: { color: dark.mutedForeground, fontSize: 12 },
+  kpiUsd: { ...typography.caption, color: dark.mutedForeground },
+  kpiLabel: { ...typography.caption, color: dark.mutedForeground },
   kpiSub: { color: dark.mutedForeground, fontSize: 11 },
   list: {
     backgroundColor: dark.card,
@@ -422,11 +534,24 @@ const styles = StyleSheet.create({
   },
   chartTitle: { color: dark.foreground, fontSize: 15, fontWeight: '600' },
   chartSub: { color: dark.mutedForeground, fontSize: 12 },
-  chartEmpty: { color: dark.mutedForeground, fontSize: 13, textAlign: 'center', paddingVertical: 40 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.base, rowGap: 6 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 8, height: 8, borderRadius: 2 },
-  legendLabel: { color: dark.mutedForeground, fontSize: 11 },
+  modeSelectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  modePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: dark.border,
+  },
+  modeDot: { width: 7, height: 7, borderRadius: 3.5 },
+  modeLabel: { fontSize: 11, fontWeight: '500' },
   allocBlock: { padding: spacing.base, gap: 10 },
   allocRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   allocName: { color: dark.foreground, fontSize: 13, width: 92 },
