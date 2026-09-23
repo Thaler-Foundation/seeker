@@ -28,6 +28,7 @@ export function HowItWorksModal({ open, onClose }: { open: boolean; onClose: () 
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <View style={s.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={s.sheet}>
           <View style={s.header}>
             <Text style={s.title}>How earn works on Thaler</Text>

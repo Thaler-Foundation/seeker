@@ -1,22 +1,32 @@
-// Create: staged deposit flow, per tier amount, served fee reserve.
-
-import { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { fetchThaler, endpoints, type PublicStats } from '@/lib/api';
+import { SidebarTrigger } from '@/components/sidebar/sidebar-trigger';
+import { TermsModal } from '@/components/terms-modal';
+import { endpoints, fetchThaler, type PublicStats } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import {
   OPEN_FEE_BUFFER_SOL,
   TIER_ORDER,
-  minDepositSol,
-  maxDepositSol,
   isDepositWithinBounds,
+  maxDepositSol,
+  minDepositSol,
   type Tier,
 } from '@/lib/contracts';
-import { useAuth } from '@/lib/auth';
-import { dark, tier, brand, radius, spacing } from '@/theme/tokens';
-import { TermsModal } from '@/components/terms-modal';
+import { brand, dark, dock, glass, radius, spacing, tier } from '@/theme/tokens';
+import { typography } from '@/theme/typography';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 const TIER_LABEL: Record<Tier, string> = {
   safe: 'Safe',
@@ -69,36 +79,59 @@ export default function Create() {
   const [pairId, setPairId] = useState<string | null>(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<Tier>('safe');
-  const [amount, setAmount] = useState(String(minDepositSol('safe')));
+  const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const triggerRef = useRef<View>(null);
+  const [dropdownCoords, setDropdownCoords] = useState<{
+    x: number;
+    y: number;
+    width: number;
+  } | null>(null);
+  const [amount, setAmount] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const minSol = minDepositSol(selectedTier);
-  const maxSol = maxDepositSol(selectedTier);
+  const toggleDropdown = () => {
+    if (dropdownOpen) {
+      setDropdownOpen(false);
+    } else {
+      triggerRef.current?.measureInWindow((x, y, width, height) => {
+        setDropdownCoords({ x, y: y + height, width });
+        setDropdownOpen(true);
+      });
+    }
+  };
+
+  const minSol = selectedTier ? minDepositSol(selectedTier) : 1;
+  const maxSol = selectedTier ? maxDepositSol(selectedTier) : 100;
   const depositSol = parseFloat(amount) || 0;
-  const withinBounds = isDepositWithinBounds(selectedTier, depositSol);
+  const withinBounds = Boolean(selectedTier && isDepositWithinBounds(selectedTier, depositSol));
   const equityLamports = String(Math.round(depositSol * 1_000_000_000));
 
   const pickTier = (t: Tier) => {
     setSelectedTier(t);
-    setAmount(String(minDepositSol(t)));
+    setDropdownOpen(false);
+    if (!amount || parseFloat(amount) <= 0) {
+      setAmount(String(minDepositSol(t)));
+    }
   };
 
   const pub = useQuery({
     queryKey: ['public-stats'],
     queryFn: () => fetchThaler<PublicStats>(null, endpoints.publicStats),
-    staleTime: 30_000,
+    staleTime: 60_000,
   });
   const usd = pub.data?.ok ? depositSol * pub.data.solPriceUsd : 0;
 
   const preview = useQuery({
     queryKey: ['vault-preview', equityLamports, selectedTier],
     queryFn: async () =>
-      fetchThaler<PreviewResponse>(
-        await getToken(),
-        endpoints.vaultPreview(equityLamports, selectedTier)
-      ),
-    enabled: authenticated && withinBounds,
+      selectedTier
+        ? fetchThaler<PreviewResponse>(
+            await getToken(),
+            endpoints.vaultPreview(equityLamports, selectedTier)
+          )
+        : null,
+    enabled: authenticated && Boolean(selectedTier) && withinBounds,
     staleTime: 30_000,
   });
 
@@ -173,38 +206,157 @@ export default function Create() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.h1}>Create vault.</Text>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: dock.height + 40 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headRow}>
+          <View style={styles.headLeft}>
+            <SidebarTrigger />
+            <Text style={styles.h1}>Create Vault</Text>
+          </View>
+        </View>
         {!authenticated ? <Text style={styles.hint}>Sign in to create a vault.</Text> : null}
 
         {stage === 'configure' ? (
           <View style={styles.panel}>
             <View style={styles.rowBetween}>
               <Text style={styles.panelTitle}>Create Vault</Text>
-              <View style={styles.chip}>
-                <Text style={styles.chipLabel}>{TIER_LABEL[selectedTier]}</Text>
-              </View>
-            </View>
-            <Text style={styles.eyebrow}>RISK PROFILE</Text>
-            <View style={styles.tierPicker}>
-              {TIER_ORDER.map((t) => (
-                <Pressable
-                  key={t}
-                  accessibilityRole="button"
-                  onPress={() => pickTier(t)}
+              {selectedTier ? (
+                <View
                   style={[
-                    styles.tierChip,
-                    selectedTier === t && { borderColor: tier[t], backgroundColor: `${tier[t]}22` },
+                    styles.chip,
+                    {
+                      backgroundColor: `${tier[selectedTier]}1c`,
+                      borderColor: `${tier[selectedTier]}50`,
+                      borderWidth: 1,
+                    },
                   ]}
                 >
-                  <Text
-                    style={[styles.tierChipLabel, selectedTier === t && { color: tier[t] }]}
-                  >
-                    {TIER_LABEL[t]}
+                  <Text style={[styles.chipLabel, { color: tier[selectedTier] }]}>
+                    {TIER_LABEL[selectedTier]}
                   </Text>
-                </Pressable>
-              ))}
+                </View>
+              ) : (
+                <View style={[styles.chip, { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]}>
+                  <Text style={[styles.chipLabel, { color: dark.mutedForeground }]}>Required</Text>
+                </View>
+              )}
             </View>
+
+            <Text style={styles.eyebrow}>RISK PROFILE *</Text>
+            
+            <View ref={triggerRef} collapsable={false} style={styles.dropdownContainer}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={toggleDropdown}
+                style={[
+                  styles.dropdownTrigger,
+                  dropdownOpen && styles.dropdownTriggerOpen,
+                ]}
+              >
+                {selectedTier ? (
+                  <View style={styles.dropdownSelectedRow}>
+                    <View
+                      style={[
+                        styles.dot,
+                        {
+                          backgroundColor: tier[selectedTier],
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                        },
+                      ]}
+                    />
+                    <Text style={styles.dropdownSelectedText}>
+                      {TIER_LABEL[selectedTier]} Vault ({TIER_APR[selectedTier].min}% - {TIER_APR[selectedTier].max}% APR)
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.dropdownPlaceholder}>Select a risk profile...</Text>
+                )}
+                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d={dropdownOpen ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'}
+                    stroke={dark.mutedForeground}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              </Pressable>
+            </View>
+
+            <Modal
+              visible={dropdownOpen}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setDropdownOpen(false)}
+            >
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => setDropdownOpen(false)} />
+              {dropdownCoords && (
+                <View
+                  style={[
+                    styles.dropdownMenu,
+                    {
+                      position: 'absolute',
+                      top: dropdownCoords.y,
+                      left: dropdownCoords.x,
+                      width: dropdownCoords.width,
+                    },
+                  ]}
+                >
+                  {TIER_ORDER.map((t) => {
+                    const isSelected = selectedTier === t;
+                    return (
+                      <Pressable
+                        key={t}
+                        accessibilityRole="button"
+                        onPress={() => pickTier(t)}
+                        style={[
+                          styles.dropdownItem,
+                          isSelected && { backgroundColor: `${tier[t]}18` },
+                        ]}
+                      >
+                        <View style={styles.dropdownItemLeft}>
+                          <View
+                            style={[
+                              styles.dot,
+                              { backgroundColor: tier[t], width: 10, height: 10, borderRadius: 5 },
+                            ]}
+                          />
+                          <View>
+                            <Text
+                              style={[
+                                styles.dropdownItemTitle,
+                                isSelected && { color: tier[t], fontWeight: '700' },
+                              ]}
+                            >
+                              {TIER_LABEL[t]} Vault
+                            </Text>
+                            <Text style={styles.dropdownItemSub}>
+                              {TIER_APR[t].min}% - {TIER_APR[t].max}% APR · {minDepositSol(t)} to {maxDepositSol(t)} SOL
+                            </Text>
+                          </View>
+                        </View>
+                        {isSelected && (
+                          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                            <Path
+                              d="M20 6L9 17l-5-5"
+                              stroke={tier[t]}
+                              strokeWidth={2.4}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </Svg>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </Modal>
+
             <View style={styles.depositBox}>
               <View style={styles.rowBetween}>
                 <Text style={styles.mutedSm}>Vault size</Text>
@@ -226,12 +378,14 @@ export default function Create() {
                   accessibilityLabel="Deposit amount in SOL"
                   selectTextOnFocus
                   style={styles.amountInput}
-                  placeholder={String(minSol)}
+                  placeholder={selectedTier ? String(minSol) : '0.0'}
                   placeholderTextColor={dark.mutedForeground}
                 />
               </View>
-              <Text style={[styles.mutedSm, !withinBounds && { color: brand.error }]}>
-                {`${TIER_LABEL[selectedTier]} tier accepts ${minSol} to ${maxSol} SOL`}
+              <Text style={[styles.mutedSm, selectedTier && !withinBounds && { color: brand.error }]}>
+                {selectedTier
+                  ? `${TIER_LABEL[selectedTier]} tier accepts ${minSol} to ${maxSol} SOL`
+                  : 'Select a risk profile above to view deposit limits'}
               </Text>
             </View>
             <Text style={styles.eyebrow}>WHERE YOUR SOL GOES</Text>
@@ -240,39 +394,49 @@ export default function Create() {
               liquidity tail, and hedged with a short position on Pacifica, all kept delta-neutral
               so returns do not depend on the SOL price.
             </Text>
-            <View style={styles.miniRows}>
-              <MiniRow
-                label="Projected APR (net)"
-                value={`${TIER_APR[selectedTier].min}% to ${TIER_APR[selectedTier].max}%`}
-                tone={brand.success}
-              />
-              <MiniRow
-                label="Projected Earnings (annual)"
-                value={
-                  preview.isLoading && authenticated
-                    ? '...'
-                    : `+${((depositSol * TIER_APR[selectedTier].min) / 100).toFixed(2)} to ${(
-                        (depositSol * TIER_APR[selectedTier].max) /
-                        100
-                      ).toFixed(2)} SOL`
-                }
-                tone={brand.success}
-              />
-              <MiniRow label="Service Fee" value="11% (on yield)" />
-              <MiniRow label="Vault Creation Fee" value={`${reserveSol} SOL reserve`} />
-            </View>
+            {selectedTier && (
+              <View style={styles.miniRows}>
+                <MiniRow
+                  label="Projected APR (net)"
+                  value={`${TIER_APR[selectedTier].min}% to ${TIER_APR[selectedTier].max}%`}
+                  tone={brand.success}
+                />
+                <MiniRow
+                  label="Projected Earnings (annual)"
+                  value={
+                    preview.isLoading && authenticated
+                      ? '...'
+                      : `+${((depositSol * TIER_APR[selectedTier].min) / 100).toFixed(2)} to ${(
+                          (depositSol * TIER_APR[selectedTier].max) /
+                          100
+                        ).toFixed(2)} SOL`
+                  }
+                  tone={brand.success}
+                />
+                <MiniRow label="Service Fee" value="11% (on yield)" />
+                <MiniRow label="Vault Creation Fee" value={`${reserveSol} SOL reserve`} />
+              </View>
+            )}
             <Pressable
               accessibilityRole="button"
-              disabled={!authenticated || !withinBounds || createWallets.isPending}
+              disabled={!authenticated || !selectedTier || !withinBounds || createWallets.isPending}
               onPress={() => setTermsOpen(true)}
               style={({ pressed }) => [
                 styles.cta,
-                (!authenticated || !withinBounds || createWallets.isPending) && { opacity: 0.5 },
+                (!authenticated || !selectedTier || !withinBounds || createWallets.isPending) && {
+                  opacity: 0.45,
+                },
                 pressed && { opacity: 0.9 },
               ]}
             >
               <Text style={styles.ctaLabel}>
-                {createWallets.isPending ? 'Preparing...' : `Open Vault · ${depositSol} SOL`}
+                {createWallets.isPending
+                  ? 'Preparing...'
+                  : !selectedTier
+                    ? 'Select a Risk Profile'
+                    : !withinBounds
+                      ? `Deposit ${minSol} - ${maxSol} SOL`
+                      : `Open Vault · ${depositSol} SOL`}
               </Text>
             </Pressable>
             {actionError ? (
@@ -445,11 +609,30 @@ function MiniRow({ label, value, tone }: { label: string; value: string; tone?: 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: dark.background },
   scroll: { padding: spacing.base, gap: spacing.base },
-  h1: { color: dark.foreground, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  hint: { color: dark.mutedForeground, fontSize: 13 },
+  headRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  headLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  h1: {
+    ...typography.title1,
+    color: dark.foreground,
+    fontSize: 28,
+  },
+  hint: {
+    ...typography.body,
+    color: dark.mutedForeground,
+    fontSize: 13,
+  },
   panel: {
-    backgroundColor: dark.card,
-    borderColor: dark.border,
+    backgroundColor: glass.bg,
+    borderColor: glass.border,
     borderWidth: 1,
     borderRadius: radius.xl,
     padding: spacing.lg,
@@ -490,6 +673,81 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     minWidth: 120,
     padding: 0,
+  },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  dropdownContainer: {
+    position: 'relative',
+    zIndex: 20,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  dropdownTriggerOpen: {
+    borderColor: 'rgba(255, 255, 255, 0.20)',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  dropdownSelectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  dropdownSelectedText: {
+    color: dark.foreground,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dropdownPlaceholder: {
+    color: dark.mutedForeground,
+    fontSize: 14,
+  },
+  dropdownMenu: {
+    backgroundColor: '#16171a',
+    borderColor: 'rgba(255, 255, 255, 0.20)',
+    borderWidth: 1.5,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 24,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  dropdownItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  dropdownItemTitle: {
+    color: dark.foreground,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dropdownItemSub: {
+    color: dark.mutedForeground,
+    fontSize: 11,
+    marginTop: 2,
   },
   tierPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   tierChip: {

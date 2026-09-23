@@ -1,22 +1,22 @@
-// Vault detail: mobile port of apps/web vault/[risk] with live API data.
-
-import { useEffect, useMemo, useState } from 'react';
-import { View, Text, Image, ScrollView, Pressable, Share, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import Svg, { Polyline, Path } from 'react-native-svg';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChartDataPoint, InteractiveChart } from '@/components/chart/interactive-chart';
 import {
-  fetchThaler,
   endpoints,
-  type PublicStats,
+  fetchThaler,
   type ListVaultsResponse,
-  type VaultPositions,
+  type PublicStats,
   type UserVaultStatsView,
+  type VaultPositions,
 } from '@/lib/api';
-import { OPEN_FEE_BUFFER_SOL } from '@/lib/contracts';
 import { useAuth } from '@/lib/auth';
-import { dark, brand, radius, spacing } from '@/theme/tokens';
+import { OPEN_FEE_BUFFER_SOL } from '@/lib/contracts';
+import { brand, dark, glass, radius, spacing } from '@/theme/tokens';
+import { typography } from '@/theme/typography';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 const TIER_META = {
   safe: { mode: 'A', label: 'Safe', color: '#99BBFF', riskLabel: 'Low', perpVenue: 'Pacifica', lst: 'jitoSOL' },
@@ -122,6 +122,25 @@ type AnalyticsResponse = {
 };
 type VaultRow = ListVaultsResponse['vaults'][number];
 
+type TriggerRow = {
+  id: string;
+  state: string;
+  step?: number;
+  borrowSolEquivalent?: number | null;
+  executedAt?: number | null;
+  createdAt: number | string;
+};
+
+type ScalpRow = {
+  id: string;
+  state: string;
+  eventType?: string;
+  positionCoin?: string;
+  profitUsd?: number | null;
+  executedAt?: number | null;
+  createdAt: number | string;
+};
+
 function formatCountdown(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const d = Math.floor(total / 86_400);
@@ -132,31 +151,91 @@ function formatCountdown(ms: number): string {
   return d > 0 ? `${d}d ${pad(h)}h ${pad(m)}m ${pad(sec)}s` : `${pad(h)}h ${pad(m)}m ${pad(sec)}s`;
 }
 
-function toLine(points: [number, number][], w = 100, h = 40): string | null {
-  if (points.length < 2) return null;
-  const xs = points.map((p) => p[0]);
-  const ys = points.map((p) => p[1]);
-  const x0 = Math.min(...xs);
-  const spanX = Math.max(...xs) - x0 || 1;
-  const y0 = Math.min(...ys);
-  const spanY = Math.max(...ys) - y0 || 1;
-  return points
-    .map(([x, y]) => `${(((x - x0) / spanX) * w).toFixed(2)},${(1 + (1 - (y - y0) / spanY) * (h - 2)).toFixed(2)}`)
-    .join(' ');
-}
+// function toLine(points: [number, number][], w = 100, h = 40): string | null {
+//   if (points.length < 2) return null;
+//   const xs = points.map((p) => p[0]);
+//   const ys = points.map((p) => p[1]);
+//   const x0 = Math.min(...xs);
+//   const spanX = Math.max(...xs) - x0 || 1;
+//   const y0 = Math.min(...ys);
+//   const spanY = Math.max(...ys) - y0 || 1;
+//   return points
+//     .map(([x, y]) => `${(((x - x0) / spanX) * w).toFixed(2)},${(1 + (1 - (y - y0) / spanY) * (h - 2)).toFixed(2)}`)
+//     .join(' ');
+// }
 
-function ChartBox({ title, points, color, legend }: { title: string; points: [number, number][]; color: string; legend: string }) {
-  const line = toLine(points);
+const VAULT_CHART_RANGES = [
+  { key: '7D', days: 7 },
+  { key: '30D', days: 30 },
+  { key: '3M', days: 90 },
+  { key: '1Y', days: 365 },
+] as const;
+type VaultChartRange = (typeof VAULT_CHART_RANGES)[number]['key'];
+
+function ChartBox({
+  title,
+  subtitle,
+  points,
+  color,
+  legend,
+  formatValue,
+  initialRange = '30D',
+}: {
+  title: string;
+  subtitle?: string;
+  points: [number, number][];
+  color: string;
+  legend: string;
+  formatValue?: (val: number) => string;
+  initialRange?: VaultChartRange;
+}) {
+  const [range, setRange] = useState<VaultChartRange>(initialRange);
+
+  const isTimestampData = useMemo(
+    () => points.length > 0 && points[0][0] > 1_000_000_000,
+    [points]
+  );
+
+  const filteredPoints = useMemo(() => {
+    if (!isTimestampData || points.length === 0) return points;
+
+    const days = VAULT_CHART_RANGES.find((r) => r.key === range)?.days ?? 30;
+    // eslint-disable-next-line react-hooks/purity
+    const cutoff = Date.now() - days * 86_400_000;
+    const res = points.filter((p) => p[0] >= cutoff);
+    return res.length >= 2 ? res : points;
+  }, [points, range, isTimestampData]);
+
+  const chartData: ChartDataPoint[] = useMemo(
+    () =>
+      filteredPoints
+        .filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]))
+        .map(([ts, val]) => ({ timestamp: ts, value: val })),
+    [filteredPoints]
+  );
+
   return (
     <View style={s.card}>
-      <Text style={s.cardTitle}>{title}</Text>
-      {line ? (
-        <Svg width="100%" height={120} viewBox="0 0 100 40" preserveAspectRatio="none">
-          <Polyline points={line} fill="none" stroke={color} strokeWidth={0.7} strokeLinejoin="round" />
-        </Svg>
-      ) : (
-        <Text style={[s.muted, { paddingVertical: 40, textAlign: 'center' }]}>No data yet.</Text>
-      )}
+      <View style={s.spreadRow}>
+        <View style={{ gap: 2 }}>
+          <Text style={s.cardTitle}>{title}</Text>
+          {subtitle ? <Text style={s.muted12}>{subtitle}</Text> : null}
+        </View>
+      </View>
+      <InteractiveChart
+        data={chartData.length >= 2 ? chartData : undefined}
+        color={color}
+        gradientColor={color}
+        height={160}
+        showTimeframes={isTimestampData}
+        showHeader={true}
+        timeframes={isTimestampData ? ['7D', '30D', '3M', '1Y'] : undefined}
+        initialTimeframe={range}
+        activeTimeframe={range}
+        onTimeframeChange={(tf) => setRange(tf as VaultChartRange)}
+        formatValue={formatValue}
+        emptyMessage="No data available yet."
+      />
       <View style={s.legendRow}>
         <View style={[s.legendDot, { backgroundColor: color }]} />
         <Text style={s.muted12}>{legend}</Text>
@@ -164,6 +243,7 @@ function ChartBox({ title, points, color, legend }: { title: string; points: [nu
     </View>
   );
 }
+
 
 function VaultInfoCard({ tier }: { tier: Tier }) {
   const meta = TIER_META[tier];
@@ -259,7 +339,7 @@ export default function VaultDetail() {
     queryKey: ['analytics'],
     queryFn: async () => fetchThaler<AnalyticsResponse>(await getToken(), endpoints.analytics),
     enabled: authenticated,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
   const breakdown = analytics.data?.strategyBreakdown.find((b) => b.mode === meta.mode);
 
@@ -270,20 +350,20 @@ export default function VaultDetail() {
         null,
         endpoints.apyHistory(tier, 30)
       ),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
 
   const vaultsQ = useQuery({
     queryKey: ['vaults'],
     queryFn: async () => fetchThaler<ListVaultsResponse>(await getToken(), endpoints.vaults),
     enabled: authenticated,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
   const statsQ = useQuery({
     queryKey: ['vault-stats'],
     queryFn: async () => fetchThaler<UserVaultStatsView>(await getToken(), endpoints.vaultStats),
     enabled: authenticated,
-    staleTime: 60_000,
+    staleTime: 2 * 60_000,
   });
 
   const myVaults = useMemo(
@@ -326,6 +406,10 @@ export default function VaultDetail() {
     [analytics.data, meta.mode]
   );
   const modeApyLatest = modeApyDaily.length ? modeApyDaily[modeApyDaily.length - 1]![1] : null;
+  const apyHistoryPoints = apyHistory.data?.points ?? [];
+  const apyHistoryLatest = apyHistoryPoints.length
+    ? apyHistoryPoints[apyHistoryPoints.length - 1]!.apyBps / 100
+    : null;
   const annualApy =
     modeApyLatest != null
       ? modeApyLatest
@@ -333,7 +417,7 @@ export default function VaultDetail() {
         ? (Number.isFinite(breakdown.apy30dMedianBps ?? NaN)
             ? (breakdown.apy30dMedianBps as number)
             : breakdown.projectedApyBps) / 100
-        : 0;
+        : apyHistoryLatest ?? (pub.data?.ok ? pub.data.apy : 0);
   const utilizationPct = (breakdown?.utilization ?? 0) * 100;
   const tierLiquiditySol =
     breakdown?.tvlSol ?? (solPrice > 0 ? (breakdown?.tvlUsd ?? 0) / solPrice : 0);
@@ -351,22 +435,20 @@ export default function VaultDetail() {
   }, [analytics.data, meta.mode, solPrice]);
   const apySeries: [number, number][] = useMemo(() => {
     if (modeApyDaily.length) return modeApyDaily;
-    if (!(annualApy > 0)) return [];
-    const points = apyHistory.data?.points ?? [];
-    const dates = points.length
-      ? points.map((p) => p.ts)
-      : (analytics.data?.tvlDailyUsd ?? []).map((p) => Date.parse(p.date));
-    return dates
-      .map((t) => [t, annualApy] as [number, number])
-      .sort((a, b) => a[0] - b[0]);
-  }, [modeApyDaily, apyHistory.data, analytics.data, annualApy]);
+    return (apyHistory.data?.points ?? []).map((p) => [p.ts, p.apyBps / 100] as [number, number]);
+  }, [modeApyDaily, apyHistory.data]);
 
   const medianApy = (APY_RANGE[tier].min + APY_RANGE[tier].max) / 2 / 100;
-  const posRoiAt = (d: number) => (Math.pow(1 + medianApy, d / 365) - 1) * 100;
-  const backSeries: [number, number][] = useMemo(
-    () => Array.from({ length: backDays + 1 }, (_, d) => [d, posRoiAt(d)] as [number, number]),
-    [backDays, medianApy]
-  );
+  const posRoiAt = useCallback((d: number) => (Math.pow(1 + medianApy, d / 365) - 1) * 100, [medianApy]);
+    const backSeries: [number, number][] = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity
+    const startTs = Date.now() - backDays * 86_400_000;
+    return Array.from({ length: backDays + 1 }, (_, d) => [
+      startTs + d * 86_400_000,
+      posRoiAt(d),
+    ] as [number, number]);
+  }, [backDays, posRoiAt]);
+
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
@@ -444,8 +526,20 @@ export default function VaultDetail() {
                   </View>
                 </View>
                 <VaultInfoCard tier={tier} />
-                <ChartBox title="Liquidity Managed" points={tvlSeries} color="#9945FF" legend="Liquidity managed (SOL)" />
-                <ChartBox title="Projected APR" points={apySeries} color={meta.color} legend={`${meta.label} APR`} />
+                <ChartBox
+                  title="Liquidity Managed"
+                  points={tvlSeries}
+                  color="#9945FF"
+                  legend="Liquidity managed (SOL)"
+                  formatValue={(v) => `${v.toFixed(2)} SOL`}
+                />
+                <ChartBox
+                  title="Projected APR"
+                  points={apySeries}
+                  color={meta.color}
+                  legend={`${meta.label} APR`}
+                  formatValue={(v) => `${v.toFixed(2)}%`}
+                />
               </>
             ) : null}
 
@@ -470,7 +564,13 @@ export default function VaultDetail() {
                   <BigStat label="Projected Return" value={`+${posRoiAt(backDays).toFixed(2)}%`} tone={brand.success} />
                   <BigStat label="Duration" value={`${backDays} Days`} />
                 </View>
-                <ChartBox title="Projected Return" points={backSeries} color="#5B9DF9" legend="Projected cumulative return" />
+                <ChartBox
+                  title="Projected Return"
+                  points={backSeries}
+                  color="#5B9DF9"
+                  legend="Projected cumulative return"
+                  formatValue={(v) => `+${v.toFixed(2)}%`}
+                />
                 <View style={s.card}>
                   <Text style={s.cardTitle}>Disclaimers</Text>
                   <Text style={s.para}>
@@ -521,7 +621,7 @@ export default function VaultDetail() {
             ) : null}
 
             {subTab === 'transactions' ? (
-              <TierTransactions vaults={myVaults} />
+              <TierTransactions vaults={myVaults} tier={tier} />
             ) : null}
           </>
         ) : null}
@@ -755,7 +855,6 @@ function PositionDetail({
   onBack: () => void;
 }) {
   const p = pos;
-  const [yieldView, setYieldView] = useState<'SOL' | 'USD'>('SOL');
   const earnedSol =
     p?.realizedYieldLamports != null
       ? Number(p.realizedYieldLamports) / LAMPORTS
@@ -806,10 +905,6 @@ function PositionDetail({
     const text = `My Thaler ${tierMeta.label} Vault generated ${sign}${earnedSol.toFixed(4)} SOL in yield. Delta-neutral jitoSOL, hedged on-chain.`;
     Share.share({ message: `${text} https://thaler.finance` }).catch(() => {});
   };
-  const yieldSeries: [number, number][] = (p?.yieldHistorySol ?? []).map((pt) => [
-    pt.ts,
-    yieldView === 'USD' ? pt.earnedSol * solPrice : pt.earnedSol,
-  ]);
 
   return (
     <>
@@ -843,35 +938,6 @@ function PositionDetail({
         </View>
       </View>
 
-      <View style={s.card}>
-        <View style={s.spreadRow}>
-          <Text style={s.cardTitle}>Realized Yield</Text>
-          <View style={s.rowL}>
-            {(['SOL', 'USD'] as const).map((v) => (
-              <Pressable
-                key={v}
-                onPress={() => setYieldView(v)}
-                style={[s.viewPill, yieldView === v && s.viewPillActive]}
-              >
-                <Text style={[s.muted12, yieldView === v && { color: dark.background }]}>{v}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-        {yieldSeries.length >= 2 ? (
-          <Svg width="100%" height={110} viewBox="0 0 100 40" preserveAspectRatio="none">
-            <Polyline
-              points={toLine(yieldSeries) ?? ''}
-              fill="none"
-              stroke={yieldView === 'SOL' ? '#9945FF' : '#5B9DF9'}
-              strokeWidth={0.7}
-              strokeLinejoin="round"
-            />
-          </Svg>
-        ) : (
-          <Text style={[s.muted, { paddingVertical: 30, textAlign: 'center' }]}>No data yet.</Text>
-        )}
-      </View>
 
       <View style={s.card}>
         <View style={s.spreadRow}>
@@ -959,9 +1025,13 @@ function PositionDetail({
           accessibilityRole="button"
           disabled={close.isPending || closeLocked}
           onPress={() => close.mutate()}
-          style={[s.btnOutline, { marginTop: 8 }, (close.isPending || closeLocked) && { opacity: 0.5 }]}
+          style={[
+            s.btnDestructive,
+            { width: '100%', marginTop: 10 },
+            (close.isPending || closeLocked) && { opacity: 0.5 },
+          ]}
         >
-          <Text style={s.btnOutlineLabel}>
+          <Text style={s.btnDestructiveLabel}>
             {close.isPending
               ? 'Closing…'
               : closeLocked
@@ -1029,61 +1099,183 @@ function rel(ts: number): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function TierTransactions({ vaults }: { vaults: VaultRow[] }) {
-  const rows = vaults
-    .flatMap((v) => {
-      const out = [
-        {
-          id: `open-${v.id}`,
-          type: 'Open Vault',
-          amount: Number(v.equityLamports) / LAMPORTS,
-          ts: new Date(v.createdAt).getTime(),
-        },
-      ];
+function TierTransactions({ vaults, tier }: { vaults: VaultRow[]; tier?: Tier }) {
+  const { authenticated, getToken } = useAuth();
+
+  const scalpsQ = useQuery({
+    queryKey: ['scalps'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return { scalps: [] as ScalpRow[] };
+      return fetchThaler<{ scalps: ScalpRow[] }>(token, endpoints.scalps).catch(() => ({
+        scalps: [] as ScalpRow[],
+      }));
+    },
+    enabled: authenticated,
+    staleTime: 2 * 60_000,
+  });
+
+  const triggersQ = useQuery({
+    queryKey: ['triggers'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return { triggers: [] as TriggerRow[] };
+      return fetchThaler<{ triggers: TriggerRow[] }>(token, endpoints.triggers).catch(() => ({
+        triggers: [] as TriggerRow[],
+      }));
+    },
+    enabled: authenticated,
+    staleTime: 2 * 60_000,
+  });
+
+  const rows = useMemo(() => {
+    const tierMode = tier ? TIER_META[tier]?.mode : null;
+    const out: {
+      id: string;
+      type: string;
+      amountStr: string;
+      isUsdc?: boolean;
+      ts: number;
+      badgeBg?: string;
+      badgeColor?: string;
+    }[] = [];
+
+    // 1. Vault events: Open Vault, Close Vault, Claim Yield
+    for (const v of vaults) {
+      const tsOpen =
+        typeof v.createdAt === 'string' ? Date.parse(v.createdAt) : Number(v.createdAt);
+      out.push({
+        id: `open-${v.id}`,
+        type: 'Open Vault',
+        amountStr: (Number(v.equityLamports) / LAMPORTS).toFixed(2),
+        ts: tsOpen,
+        badgeBg: 'rgba(250,250,250,0.08)',
+        badgeColor: dark.foreground,
+      });
+
       if (v.latestClose) {
+        const tsClose =
+          typeof v.updatedAt === 'string' ? Date.parse(v.updatedAt) : Number(v.updatedAt);
         out.push({
           id: `close-${v.id}`,
           type: 'Close Vault',
-          amount: Number(v.equityLamports) / LAMPORTS,
-          ts: new Date(v.updatedAt).getTime(),
+          amountStr: (Number(v.equityLamports) / LAMPORTS).toFixed(2),
+          ts: tsClose,
+          badgeBg: 'rgba(239,68,68,0.12)',
+          badgeColor: brand.error,
         });
       }
+
       if (v.latestClaim) {
+        const tsClaim =
+          typeof v.updatedAt === 'string' ? Date.parse(v.updatedAt) : Number(v.updatedAt);
+        const amt = v.latestClaim.amountLamports
+          ? `+${(Number(v.latestClaim.amountLamports) / LAMPORTS).toFixed(4)}`
+          : '-';
         out.push({
           id: `claim-${v.id}`,
           type: 'Claim Yield',
-          amount: v.latestClaim.amountLamports
-            ? Number(v.latestClaim.amountLamports) / LAMPORTS
-            : NaN,
-          ts: new Date(v.updatedAt).getTime(),
+          amountStr: amt,
+          ts: tsClaim,
+          badgeBg: 'rgba(34,197,94,0.12)',
+          badgeColor: brand.success,
         });
       }
-      return out;
-    })
-    .sort((a, b) => b.ts - a.ts);
+    }
+
+    // 2. Scalps & Pre-Scalps
+    const rawScalps: ScalpRow[] = Array.isArray(scalpsQ.data)
+      ? scalpsQ.data
+      : scalpsQ.data?.scalps ?? [];
+    for (const s of rawScalps) {
+      if (s.state !== 'EXECUTED') continue;
+      const sAny = s as any;
+      if (tierMode && sAny.mode && sAny.mode !== tierMode) continue;
+      if (tier && sAny.tier && sAny.tier.toLowerCase() !== tier.toLowerCase()) continue;
+
+      const rawTs = s.executedAt ?? s.createdAt;
+      const ts = typeof rawTs === 'string' ? Date.parse(rawTs) : Number(rawTs ?? 0);
+      const isScalp = s.eventType === 'SCALP' || !s.eventType;
+      const eventName = isScalp ? 'Scalp' : 'Pre-Scalp';
+      const profitStr = s.profitUsd != null ? `+${s.profitUsd.toFixed(2)} USDC` : '-';
+
+      out.push({
+        id: `scalp-${s.id}`,
+        type: eventName,
+        amountStr: profitStr,
+        isUsdc: true,
+        ts,
+        badgeBg: 'rgba(20,241,149,0.12)',
+        badgeColor: '#14F195',
+      });
+    }
+
+    // 3. Upside Borrow (Triggers)
+    const rawTriggers: TriggerRow[] = Array.isArray(triggersQ.data)
+      ? triggersQ.data
+      : triggersQ.data?.triggers ?? [];
+    for (const t of rawTriggers) {
+      if (t.state !== 'EXECUTED') continue;
+      const tAny = t as any;
+      if (tierMode && tAny.mode && tAny.mode !== tierMode) continue;
+      if (tier && tAny.tier && tAny.tier.toLowerCase() !== tier.toLowerCase()) continue;
+
+      const rawTs = t.executedAt ?? t.createdAt;
+      const ts = typeof rawTs === 'string' ? Date.parse(rawTs) : Number(rawTs ?? 0);
+
+      out.push({
+        id: `trig-${t.id}`,
+        type: 'Upside Borrow',
+        amountStr: t.borrowSolEquivalent != null ? t.borrowSolEquivalent.toFixed(4) : '-',
+        ts,
+        badgeBg: 'rgba(192,132,252,0.12)',
+        badgeColor: '#C084FC',
+      });
+    }
+
+    return out.sort((a, b) => b.ts - a.ts);
+  }, [vaults, scalpsQ.data, triggersQ.data, tier]);
+
   return (
     <View style={s.card}>
       <Text style={s.cardTitle}>Transaction History</Text>
       <View style={[s.tableHead, { paddingHorizontal: 0 }]}>
-        <Text style={[s.tableHeadCell, { flex: 1.4 }]}>Date</Text>
-        <Text style={[s.tableHeadCell, { flex: 1 }]}>Type</Text>
-        <Text style={[s.tableHeadCell, { flex: 1, textAlign: 'right' }]}>Tokens</Text>
+        <Text style={[s.tableHeadCell, { flex: 1.2 }]}>Date</Text>
+        <Text style={[s.tableHeadCell, { flex: 1.3 }]}>Type</Text>
+        <Text style={[s.tableHeadCell, { flex: 1.2, textAlign: 'right' }]}>Tokens</Text>
       </View>
-      {rows.map((r) => (
-        <View key={r.id} style={s.txRow}>
-          <Text style={[s.factValue, { flex: 1.4 }]}>{rel(r.ts)}</Text>
-          <View style={{ flex: 1 }}>
-            <View style={s.typeBadge}>
-              <Text style={s.typeBadgeLabel}>{r.type}</Text>
+      {/* FlatList virtualizes the rows so only visible items are rendered */}
+      <FlatList
+        data={rows}
+        keyExtractor={(r) => r.id}
+        scrollEnabled={false}
+        renderItem={({ item: r }) => (
+          <View style={s.txRow}>
+            <Text style={[s.factValue, { flex: 1.2 }]}>{rel(r.ts)}</Text>
+            <View style={{ flex: 1.3 }}>
+              <View style={[s.typeBadge, r.badgeBg ? { backgroundColor: r.badgeBg } : null]}>
+                <Text style={[s.typeBadgeLabel, r.badgeColor ? { color: r.badgeColor } : null]}>
+                  {r.type}
+                </Text>
+              </View>
+            </View>
+            <View style={[s.rowL, { flex: 1.2, justifyContent: 'flex-end' }]}>
+              <Text style={s.factValue}>{r.amountStr}</Text>
+              {!r.isUsdc && r.amountStr !== '-' ? (
+                <Image
+                  source={require('../../../assets/images/solana-logo.png')}
+                  style={s.solTokenXs}
+                />
+              ) : null}
             </View>
           </View>
-          <View style={[s.rowL, { flex: 1, justifyContent: 'flex-end' }]}>
-            <Text style={s.factValue}>{Number.isFinite(r.amount) ? r.amount.toFixed(2) : '-'}</Text>
-            <Image source={require('../../../assets/images/solana-logo.png')} style={s.solTokenXs} />
-          </View>
-        </View>
-      ))}
-      {rows.length === 0 ? <Text style={[s.muted, { paddingVertical: 14 }]}>No activity yet.</Text> : null}
+        )}
+        ListEmptyComponent={
+          <Text style={[s.muted, { paddingVertical: 14 }]}>
+            {scalpsQ.isLoading || triggersQ.isLoading ? 'Loading activity…' : 'No activity yet.'}
+          </Text>
+        }
+      />
     </View>
   );
 }
@@ -1102,17 +1294,17 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   solToken: { width: 36, height: 36, borderRadius: 18 },
-  h1: { color: dark.foreground, fontSize: 24, fontWeight: '700', letterSpacing: -0.5, flexShrink: 1 },
+  h1: { ...typography.title1, color: dark.foreground, fontSize: 24, flexShrink: 1 },
   riskChip: { borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4 },
   riskChipLabel: { fontSize: 11, fontWeight: '500' },
   headStats: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
   headStat: { gap: 2 },
-  headStatValue: { color: dark.foreground, fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  headStatValue: { ...typography.mono, color: dark.foreground, fontSize: 17 },
   headDivider: { width: 1, height: 30, backgroundColor: dark.border },
   tabs: { flexDirection: 'row', gap: spacing.xl, borderBottomWidth: 1, borderBottomColor: dark.border },
   tab: { paddingBottom: 12, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: dark.foreground },
-  tabLabel: { color: dark.mutedForeground, fontSize: 16, fontWeight: '600' },
+  tabLabel: { ...typography.headline, color: dark.mutedForeground, fontSize: 16 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   subPill: {
     borderRadius: radius.full,
@@ -1125,14 +1317,14 @@ const s = StyleSheet.create({
   subPillActive: { backgroundColor: dark.muted, borderColor: 'rgba(250,250,250,0.4)' },
   subPillLabel: { color: dark.mutedForeground, fontSize: 14, fontWeight: '500' },
   card: {
-    backgroundColor: dark.card,
-    borderColor: dark.border,
+    backgroundColor: glass.bg,
+    borderColor: glass.border,
     borderWidth: 1,
     borderRadius: radius.xl + 2,
     padding: spacing.base,
     gap: spacing.md,
   },
-  cardTitle: { color: dark.foreground, fontSize: 16, fontWeight: '600' },
+  cardTitle: { ...typography.title3, color: dark.foreground, fontSize: 16 },
   bigStatGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   bigStat: {
     flexGrow: 1,
