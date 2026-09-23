@@ -1,5 +1,3 @@
-// Tokens from apps/web globals.css and tier-meta.ts.
-
 export const dark = {
   background: '#0a0a0b',
   foreground: '#fafafa',
@@ -75,6 +73,21 @@ export const radius = {
   xl: 12,
   xxl: 16,
   full: 999,
+} as const;
+
+export const glass = {
+  bg: 'rgba(20, 20, 24, 0.82)',
+  bgElevated: 'rgba(28, 28, 34, 0.88)',
+  border: 'rgba(255, 255, 255, 0.12)',
+  borderActive: 'rgba(255, 255, 255, 0.24)',
+  highlight: 'rgba(255, 255, 255, 0.08)',
+  backdrop: 'rgba(0, 0, 0, 0.65)',
+} as const;
+
+export const dock = {
+  height: 64,
+  radius: 32,
+  bottomOffset: 12,
 } as const;
 
 export type ThemeColors = typeof dark;
