@@ -51,6 +51,7 @@ function InnerAuthProvider({ children }: { children: ReactNode }) {
     setGateError(null);
     try {
       const token = await getAccessToken();
+      console.log('[Auth:BFF] verifyAllowlist: Privy token present?', Boolean(token));
       const res = await fetch(`${bffBaseUrl()}/api/auth/allowlist`, {
         method: 'POST',
         headers: {
@@ -59,6 +60,7 @@ function InnerAuthProvider({ children }: { children: ReactNode }) {
         },
         body: JSON.stringify({}),
       });
+      console.log('[Auth:BFF] verifyAllowlist: response status =', res.status);
       if (res.ok) {
         setGate('allowed');
         return 'allowed';
@@ -68,10 +70,21 @@ function InnerAuthProvider({ children }: { children: ReactNode }) {
         setGateError('This account is not on the Thaler beta list.');
         return 'denied';
       }
+      let errBody = '';
+      try {
+        errBody = await res.text();
+      } catch {}
+      console.warn('[Auth:BFF] verifyAllowlist failed with status:', res.status, errBody);
       setGate('error');
       setGateError('Verification failed. Please try again.');
       return 'error';
-    } catch {
+    } catch (err: any) {
+      console.error('[Auth:BFF] verifyAllowlist fetch/network error:', {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+        raw: err,
+      });
       setGate('error');
       setGateError('Verification failed. Please try again.');
       return 'error';
@@ -168,10 +181,36 @@ function InnerAuthProvider({ children }: { children: ReactNode }) {
       gate,
       gateError,
       sendCode: async (addr: string) => {
-        await emailLogin.sendCode({ email: addr });
+        console.log('[Auth:Privy] sendCode starting for:', addr);
+        try {
+          await emailLogin.sendCode({ email: addr });
+          console.log('[Auth:Privy] sendCode succeeded for:', addr);
+        } catch (err: any) {
+          console.error('[Auth:Privy] sendCode FAILED for:', addr, 'Error:', {
+            name: err?.name,
+            message: err?.message,
+            code: err?.code,
+            stack: err?.stack,
+            cause: err?.cause,
+          });
+          throw err;
+        }
       },
       loginWithCode: async (addr: string, code: string) => {
-        await emailLogin.loginWithCode({ email: addr, code });
+        console.log('[Auth:Privy] loginWithCode starting for:', addr, 'code length:', code.length);
+        try {
+          await emailLogin.loginWithCode({ email: addr, code });
+          console.log('[Auth:Privy] loginWithCode succeeded for:', addr);
+        } catch (err: any) {
+          console.error('[Auth:Privy] loginWithCode FAILED for:', addr, 'Error:', {
+            name: err?.name,
+            message: err?.message,
+            code: err?.code,
+            stack: err?.stack,
+            cause: err?.cause,
+          });
+          throw err;
+        }
       },
       getToken: () => getAccessToken(),
       signOut: async () => {
@@ -192,6 +231,7 @@ function InnerAuthProvider({ children }: { children: ReactNode }) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const appId = process.env.EXPO_PUBLIC_PRIVY_APP_ID;
   const clientId = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID;
+  console.log('[Auth:Boot] PrivyProvider initialized with appId:', appId ? `${appId.slice(0, 6)}...` : 'MISSING', 'clientId:', clientId ? `${clientId.slice(0, 10)}...` : 'MISSING');
   if (!appId) {
     return (
       <AuthContext.Provider
