@@ -8,6 +8,8 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -39,6 +41,7 @@ export interface InteractiveChartProps {
   showTimeframes?: boolean;
   showHeader?: boolean;
   emptyMessage?: string;
+  isSyncing?: boolean;
 }
 
 // Monotone cubic spline curve generator (Fritsch-Carlson algorithm)
@@ -137,6 +140,7 @@ export function InteractiveChart({
   showTimeframes = true,
   showHeader = false,
   emptyMessage,
+  isSyncing = false,
 }: InteractiveChartProps) {
   const [internalTimeframe, setInternalTimeframe] = useState(initialTimeframe);
   const activeTimeframe = propActiveTimeframe ?? internalTimeframe;
@@ -282,6 +286,21 @@ export function InteractiveChart({
     };
   });
 
+  const syncPulse = useSharedValue(0);
+  useEffect(() => {
+    if (isSyncing) {
+      syncPulse.value = withRepeat(
+        withSequence(withTiming(1, { duration: 700 }), withTiming(0.25, { duration: 700 })),
+        -1,
+        true
+      );
+    } else {
+      syncPulse.value = withTiming(0, { duration: 200 });
+    }
+  }, [isSyncing, syncPulse]);
+
+  const syncDotStyle = useAnimatedStyle(() => ({ opacity: syncPulse.value }));
+
   if (!hasAnyData) {
     return (
       <View style={[styles.container, styles.emptyContainer, { height }]}>
@@ -310,16 +329,19 @@ export function InteractiveChart({
               </AppText>
             </View>
           </View>
-          <AppText variant="caption" color={dark.mutedForeground}>
-            {scrubIndex !== null && currentPoint
-              ? new Date(currentPoint.data.timestamp).toLocaleString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : `${activeTimeframe} Performance`}
-          </AppText>
+          <View style={styles.captionRow}>
+            <AppText variant="caption" color={dark.mutedForeground}>
+              {scrubIndex !== null && currentPoint
+                ? new Date(currentPoint.data.timestamp).toLocaleString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : `${activeTimeframe} Performance`}
+            </AppText>
+            {isSyncing ? <Animated.View style={[styles.syncDot, syncDotStyle]} /> : null}
+          </View>
         </View>
       )}
 
@@ -456,6 +478,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: radius.full,
+  },
+  captionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  syncDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: brand.success,
   },
   chartWrapper: {
     width: '100%',

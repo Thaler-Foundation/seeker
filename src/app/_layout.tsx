@@ -1,7 +1,7 @@
 import { SidebarProvider } from '@/components/sidebar/sidebar-context';
 import { SidebarDrawer } from '@/components/sidebar/sidebar-drawer';
 import { AuthProvider } from '@/lib/auth';
-import { asyncStoragePersister, queryClient } from '@/lib/query-client';
+import { asyncStoragePersister, queryClient, shouldDehydrateQuery } from '@/lib/query-client';
 import { dark } from '@/theme/tokens';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useFonts } from 'expo-font';
@@ -49,9 +49,7 @@ export default function RootLayout() {
         client={queryClient}
         persistOptions={{
           persister: asyncStoragePersister,
-          dehydrateOptions: {
-            shouldDehydrateQuery: (query) => query.state.status === 'success',
-          },
+          dehydrateOptions: { shouldDehydrateQuery },
         }}
       >
         <AuthProvider>

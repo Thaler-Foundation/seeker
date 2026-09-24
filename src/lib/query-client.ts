@@ -2,7 +2,11 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { QueryClient } from '@tanstack/react-query';
+import { dehydrate, focusManager, QueryClient } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
+
+export const shouldDehydrateQuery = (query: { state: { status: string } }) =>
+  query.state.status === 'success';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,5 +68,18 @@ const safeStorage = {
 export const asyncStoragePersister = createAsyncStoragePersister({
   storage: safeStorage,
   key: 'thaler_query_cache',
-  throttleTime: 2_000,
+  throttleTime: 300,
 });
+
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', (status) => {
+    focusManager.setFocused(status === 'active');
+    if (status !== 'active') {
+      void asyncStoragePersister.persistClient({
+        timestamp: Date.now(),
+        buster: '',
+        clientState: dehydrate(queryClient, { shouldDehydrateQuery }) as never,
+      });
+    }
+  });
+}

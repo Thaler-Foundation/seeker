@@ -201,7 +201,7 @@ export default function WalletScreen() {
           id: `scalp-${x.id}`,
           title: x.eventType === 'SCALP' ? 'Scalp' : 'Pre-Scalp',
           sub: x.positionCoin ?? 'SOL',
-          value: x.profitUsd !== null ? `${x.profitUsd.toFixed(2)} USDC` : '-',
+          value: x.profitUsd !== null ? `${x.profitUsd.toFixed(4)} SOL` : '-',
           ts: x.executedAt ?? x.createdAt,
         }))
     )

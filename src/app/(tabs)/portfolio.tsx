@@ -175,7 +175,7 @@ export default function Portfolio() {
   const { width } = useWindowDimensions();
   const scale =
     Math.max(0.6, Math.min(1, (width - 66) / 346)) / Math.max(1, PixelRatio.getFontScale());
-  const { getToken, authenticated } = useAuth();
+  const { getToken, authenticated, sessionReady } = useAuth();
   const [tab, setTab] = useState<'vaults' | 'transactions'>('vaults');
   const [range, setRange] = useState<RangeKey>('7D');
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
@@ -192,14 +192,14 @@ export default function Portfolio() {
     queryKey: ['vault-stats'],
     queryFn: async () =>
       fetchThaler<UserVaultStatsView>(await getToken(), endpoints.vaultStats),
-    enabled: authenticated,
+    enabled: sessionReady,
     staleTime: 2 * 60_000,
   });
 
   const vaultList = useQuery({
     queryKey: ['vaults'],
     queryFn: async () => fetchThaler<ListVaultsResponse>(await getToken(), endpoints.vaults),
-    enabled: authenticated,
+    enabled: sessionReady,
     staleTime: 2 * 60_000,
   });
   const vaultById = useMemo(
@@ -289,17 +289,11 @@ export default function Portfolio() {
       }
 
       for (const t of allTriggers.filter((x) => x.state === 'EXECUTED')) {
-        const tAny = t as any;
-        let detail = 'Upside Hedge';
-        if (t.step != null)            detail = `Step ${t.step} · Upside Hedge`;
-        else if (tAny.stepNumber != null) detail = `Step ${tAny.stepNumber} · Upside Hedge`;
-        else if (tAny.stepIndex  != null) detail = `Step ${tAny.stepIndex + 1} · Upside Hedge`;
-        else if (tAny.mode)            detail = `Mode ${tAny.mode} · Upside Hedge`;
         const rawTs = t.executedAt ?? t.createdAt;
         rows.push({
           id: `trig-${t.id}`,
           interaction: 'Upside Borrow',
-          detail,
+          detail: '',
           amount: t.borrowSolEquivalent != null
             ? `${t.borrowSolEquivalent.toFixed(4)} SOL`
             : '-',
@@ -312,15 +306,15 @@ export default function Portfolio() {
         rows.push({
           id: `scalp-${s.id}`,
           interaction: s.eventType === 'SCALP' ? 'Scalp' : 'Pre-Scalp',
-          detail: s.positionCoin ? `${s.positionCoin} · Pacifica Perp` : 'SOL · Pacifica Perp',
-          amount: s.profitUsd != null ? `+${s.profitUsd.toFixed(2)} USDC` : '-',
+          detail: '',
+          amount: s.profitUsd != null ? `+$${s.profitUsd.toFixed(2)}` : '-',
           ts: typeof rawTs === 'string' ? Date.parse(rawTs as unknown as string) : (rawTs ?? 0),
         });
       }
 
       return rows.sort((a, b) => b.ts - a.ts);
     },
-    enabled: authenticated,
+    enabled: sessionReady,
     staleTime: 5 * 60_000,
     gcTime: 24 * 60 * 60_000,
     retry: 1,
@@ -339,7 +333,7 @@ export default function Portfolio() {
     queryKey: ['equity-history'],
     queryFn: async () =>
       fetchThaler<{ points: EquityPoint[] }>(await getToken(), endpoints.equityHistory(365)),
-    enabled: authenticated,
+    enabled: sessionReady,
     staleTime: 5 * 60_000,
   });
   const rangeDays = RANGES.find((r) => r.key === range)!.days;
@@ -349,6 +343,13 @@ export default function Portfolio() {
     .map((p) => [Date.parse(p.date), p.equitySol] as const)
     .filter((p) => Number.isFinite(p[0]) && p[0] >= cutoff)
     .sort((a, b) => a[0] - b[0]);
+
+  const kpiSyncing =
+    authenticated &&
+    ((stats.isFetching && Boolean(stats.data)) ||
+      (vaultList.isFetching && Boolean(vaultList.data)) ||
+      (pub.isFetching && Boolean(pub.data)));
+  const chartSyncing = authenticated && equity.isFetching && Boolean(equity.data);
 
   const rows = stats.data?.vaults ?? [];
   const depositedSol = rows.reduce((s, r) => {
@@ -391,6 +392,12 @@ export default function Portfolio() {
           <View style={styles.headLeft}>
             <SidebarTrigger />
             <Text style={styles.h1}>Portfolio</Text>
+            {kpiSyncing ? (
+              <View style={styles.syncBadge}>
+                <View style={styles.syncDotStatic} />
+                <Text style={styles.syncLabel}>Syncing</Text>
+              </View>
+            ) : null}
           </View>
           <View style={styles.headRight}>
             <Pressable
@@ -421,9 +428,13 @@ export default function Portfolio() {
         <View style={styles.grid}>
           {KPIS.map((k) => (
             <View key={k.label} style={styles.kpi}>
-              <Text style={[styles.kpiValue, k.tone ? { color: k.tone } : null]}>
-                {stats.isLoading && !stats.data ? '-' : k.value}
-              </Text>
+              {stats.isLoading && !stats.data ? (
+                <View style={[styles.skelLine, styles.kpiSkelLine]} />
+              ) : (
+                <Text style={[styles.kpiValue, k.tone ? { color: k.tone } : null]}>
+                  {k.value}
+                </Text>
+              )}
               <Text style={styles.kpiLabel}>{k.label}</Text>
             </View>
           ))}
@@ -449,6 +460,7 @@ export default function Portfolio() {
             formatValue={(v) => (currency === 'USD' ? `$${v.toFixed(2)}` : `${v.toFixed(4)} SOL`)}
             showHeader={true}
             emptyMessage={authenticated ? 'No data yet.' : 'Sign in to view equity history.'}
+            isSyncing={chartSyncing}
           />
         </View>
 
@@ -604,9 +616,11 @@ export default function Portfolio() {
                       </View>
                       <View style={styles.txItemMeta}>
                         <Text style={styles.txItemTitle}>{r.interaction}</Text>
-                        <Text style={styles.txItemDetail} numberOfLines={1}>
-                          {r.detail}
-                        </Text>
+                        {r.detail ? (
+                          <Text style={styles.txItemDetail} numberOfLines={1}>
+                            {r.detail}
+                          </Text>
+                        ) : null}
                       </View>
                     </View>
                     <View style={styles.txItemRight}>
@@ -671,6 +685,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  syncDotStatic: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: brand.success,
+  },
+  syncLabel: {
+    color: dark.mutedForeground,
+    fontSize: 11,
+    fontWeight: '500',
+  },
   headRight: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -707,6 +737,11 @@ const styles = StyleSheet.create({
   kpiLabel: {
     ...typography.caption,
     color: dark.mutedForeground,
+  },
+  kpiSkelLine: {
+    width: 64,
+    height: 18,
+    borderRadius: 6,
   },
   actions: {
     flexDirection: 'row',

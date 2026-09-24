@@ -13,7 +13,7 @@ import { brand, dark, glass, radius, spacing } from '@/theme/tokens';
 import { typography } from '@/theme/typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -121,6 +121,10 @@ type AnalyticsResponse = {
   apyByModeDaily?: { date: string; mode: string; apyBps: number }[];
 };
 type VaultRow = ListVaultsResponse['vaults'][number];
+
+function isLiveTierVault(v: VaultRow, tier: Tier): boolean {
+  return v.tier === tier && v.state === 'DONE' && v.latestClose === null && v.metrics !== null;
+}
 
 type TriggerRow = {
   id: string;
@@ -316,11 +320,16 @@ export default function VaultDetail() {
   const risk = String(params.risk ?? 'safe').toLowerCase();
   const tier: Tier = (risk in TIER_META ? risk : 'safe') as Tier;
   const meta = TIER_META[tier];
-  const { getToken, authenticated } = useAuth();
+  const { getToken, authenticated, sessionReady } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'overview' | 'position' | 'info'>(
-    params.tab === 'position' ? 'position' : 'overview'
-  );
+  const explicitTab = params.tab === 'position' || params.tab === 'info' ? params.tab : null;
+  const [tab, setTab] = useState<'overview' | 'position' | 'info'>(() => {
+    if (explicitTab) return explicitTab;
+    const cachedVaults = queryClient.getQueryData<ListVaultsResponse>(['vaults'])?.vaults ?? [];
+    const hasLiveTierVault = cachedVaults.some((v) => isLiveTierVault(v, tier));
+    return hasLiveTierVault ? 'position' : 'overview';
+  });
+  const tabDefaultedRef = useRef(explicitTab !== null);
   const [overviewPill, setOverviewPill] = useState<'loop' | 'advanced' | 'backtesting'>('loop');
   const [subTab, setSubTab] = useState<'vaults' | 'liquidation' | 'transactions'>('vaults');
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -338,7 +347,7 @@ export default function VaultDetail() {
   const analytics = useQuery({
     queryKey: ['analytics'],
     queryFn: async () => fetchThaler<AnalyticsResponse>(await getToken(), endpoints.analytics),
-    enabled: authenticated,
+    enabled: sessionReady,
     staleTime: 5 * 60_000,
   });
   const breakdown = analytics.data?.strategyBreakdown.find((b) => b.mode === meta.mode);
@@ -356,23 +365,29 @@ export default function VaultDetail() {
   const vaultsQ = useQuery({
     queryKey: ['vaults'],
     queryFn: async () => fetchThaler<ListVaultsResponse>(await getToken(), endpoints.vaults),
-    enabled: authenticated,
+    enabled: sessionReady,
     staleTime: 2 * 60_000,
   });
   const statsQ = useQuery({
     queryKey: ['vault-stats'],
     queryFn: async () => fetchThaler<UserVaultStatsView>(await getToken(), endpoints.vaultStats),
-    enabled: authenticated,
+    enabled: sessionReady,
     staleTime: 2 * 60_000,
   });
 
   const myVaults = useMemo(
-    () =>
-      (vaultsQ.data?.vaults ?? []).filter(
-        (v) => v.tier === tier && v.state === 'DONE' && v.latestClose === null && v.metrics !== null
-      ),
+    () => (vaultsQ.data?.vaults ?? []).filter((v) => isLiveTierVault(v, tier)),
     [vaultsQ.data, tier]
   );
+
+  useEffect(() => {
+    if (tabDefaultedRef.current || !vaultsQ.data) return;
+    tabDefaultedRef.current = true;
+    if (myVaults.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTab('position');
+    }
+  }, [vaultsQ.data, myVaults.length]);
   const attentionVaults = useMemo(
     () =>
       (vaultsQ.data?.vaults ?? []).filter(
@@ -391,7 +406,7 @@ export default function VaultDetail() {
     queryFn: async () =>
       fetchThaler<VaultPositions>(await getToken(), endpoints.vaultPositions(posTargetId!)),
     enabled:
-      authenticated &&
+      sessionReady &&
       posTargetId !== null &&
       ((subTab === 'vaults' && selectedId !== null) || subTab === 'liquidation'),
     refetchInterval: 30_000,
@@ -486,7 +501,14 @@ export default function VaultDetail() {
               { key: 'info', label: 'Info & FAQs' },
             ] as const
           ).map((t) => (
-            <Pressable key={t.key} onPress={() => setTab(t.key)} style={[s.tab, tab === t.key && s.tabActive]}>
+            <Pressable
+              key={t.key}
+              onPress={() => {
+                tabDefaultedRef.current = true;
+                setTab(t.key);
+              }}
+              style={[s.tab, tab === t.key && s.tabActive]}
+            >
               <Text style={[s.tabLabel, tab === t.key && { color: dark.foreground }]}>{t.label}</Text>
             </Pressable>
           ))}
@@ -1197,7 +1219,7 @@ function TierTransactions({ vaults, tier }: { vaults: VaultRow[]; tier?: Tier })
       const ts = typeof rawTs === 'string' ? Date.parse(rawTs) : Number(rawTs ?? 0);
       const isScalp = s.eventType === 'SCALP' || !s.eventType;
       const eventName = isScalp ? 'Scalp' : 'Pre-Scalp';
-      const profitStr = s.profitUsd != null ? `+${s.profitUsd.toFixed(2)} USDC` : '-';
+      const profitStr = s.profitUsd != null ? `+${s.profitUsd.toFixed(4)} SOL` : '-';
 
       out.push({
         id: `scalp-${s.id}`,

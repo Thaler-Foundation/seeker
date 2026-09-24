@@ -1,6 +1,6 @@
-// Privy email auth plus the BFF /api/auth/allowlist gate.
-
-import 'react-native-get-random-values';
+import { bffBaseUrl, endpoints, fetchThaler, ThalerProxyError } from '@/lib/api';
+import { PrivyProvider, useLoginWithEmail, usePrivy } from '@privy-io/expo';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   createContext,
   useCallback,
@@ -11,14 +11,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { PrivyProvider, usePrivy, useLoginWithEmail } from '@privy-io/expo';
-import { useQueryClient } from '@tanstack/react-query';
-import { bffBaseUrl, endpoints, fetchThaler, ThalerProxyError } from '@/lib/api';
+import 'react-native-get-random-values';
 
 export type GateStatus = 'idle' | 'verifying' | 'allowed' | 'denied' | 'error';
 
 type AuthState = {
   ready: boolean;
+  sessionReady: boolean;
   authenticated: boolean;
   email: string | null;
   gate: GateStatus;
@@ -176,6 +175,7 @@ function InnerAuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthState>(
     () => ({
       ready: isReady,
+      sessionReady: isReady && user !== null,
       authenticated: user !== null && gate === 'allowed',
       email,
       gate,
@@ -237,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       <AuthContext.Provider
         value={{
           ready: true,
+          sessionReady: false,
           authenticated: false,
           email: null,
           gate: 'idle',
