@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Keyboard,
   Platform,
   Pressable,
@@ -132,7 +133,6 @@ export default function Login() {
   const trimmedEmail = email.trim().toLowerCase();
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
 
-  // Resend countdown timer
   useEffect(() => {
     if (step !== 'code' || countdown <= 0) return;
     const timer = setInterval(() => {
@@ -225,6 +225,12 @@ export default function Login() {
     if (auth.gate === 'allowed') router.replace('/(tabs)/home');
   }, [auth.gate, router]);
 
+  const showBetaGate =
+    step === 'start' &&
+    auth.gate !== 'denied' &&
+    auth.gate !== 'error' &&
+    (!auth.ready || auth.sessionReady);
+
   return (
     <View style={styles.root}>
       <Waves step={step} />
@@ -255,7 +261,24 @@ export default function Login() {
               keyboardHeight > 0 && { paddingBottom: keyboardHeight + spacing.base },
             ]}
           >
-            {/* STEP 1: START */}
+            {showBetaGate ? (
+              <Animated.View
+                entering={FadeIn.duration(220)}
+                style={styles.gateContainer}
+              >
+                <ActivityIndicator size="large" color={dark.foreground} />
+                <View style={styles.gateTextBlock}>
+                  <Text style={styles.gateTitle}>Verifying beta access</Text>
+                  <Text style={styles.gateSubtitle}>
+                    Just a moment while we confirm your access to the Thaler
+                    private beta.
+                  </Text>
+                </View>
+              </Animated.View>
+            ) : null}
+
+            {!showBetaGate ? (
+              <>
             {step === 'start' ? (
               <Animated.View
                 entering={FadeIn.duration(220)}
@@ -285,7 +308,6 @@ export default function Login() {
               </Animated.View>
             ) : null}
 
-            {/* STEP 2: EMAIL */}
             {step === 'email' ? (
               <Animated.View
                 entering={FadeIn.duration(220)}
@@ -361,7 +383,6 @@ export default function Login() {
               </Animated.View>
             ) : null}
 
-            {/* STEP 3: OTP CODE */}
             {step === 'code' ? (
               <Animated.View
                 entering={FadeIn.duration(220)}
@@ -470,6 +491,8 @@ export default function Login() {
                 </PressableScale>
               </Animated.View>
             ) : null}
+              </>
+            ) : null}
           </View>
         </View>
       </SafeAreaView>
@@ -521,6 +544,32 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     gap: spacing.lg,
+  },
+  gateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.lg,
+  },
+  gateTextBlock: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  gateTitle: {
+    color: dark.foreground,
+    fontSize: 22,
+    lineHeight: 28,
+    fontFamily: fontFamilies.rounded.bold,
+    letterSpacing: -0.4,
+    textAlign: 'center',
+  },
+  gateSubtitle: {
+    color: dark.mutedForeground,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: fontFamilies.rounded.regular,
+    textAlign: 'center',
+    maxWidth: 300,
   },
   badge: {
     flexDirection: 'row',

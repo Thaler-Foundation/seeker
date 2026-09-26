@@ -68,7 +68,6 @@ export function AnimatedTabIcon({ name, focused }: AnimatedTabIconProps) {
 
   return (
     <Animated.View style={[s.iconContainer, animStyle]}>
-      {/* Radiant ambient halo when focused (disabled for simple create button) */}
       {name !== 'create' && (
         <Animated.View
           style={[

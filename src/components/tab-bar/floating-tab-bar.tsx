@@ -77,12 +77,10 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
-  // Floating dock geometry
   const dockWidth = Math.min(width - 32, 420);
   const tabCount = state.routes.length;
   const tabWidth = dockWidth / (tabCount || 1);
 
-  // Active gliding indicator
   const indicatorX = useSharedValue(state.index * tabWidth);
 
   useEffect(() => {
@@ -100,7 +98,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
 
   return (
     <>
-      {/* Ambient gradient fade at bottom screen edge */}
       <View
         style={[s.gradientFade, { height: insets.bottom + dock.height + 28 }]}
         pointerEvents="none"
@@ -111,7 +108,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
         />
       </View>
 
-      {/* Floating pill container */}
       <View
         style={[
           s.dockWrapper,
@@ -122,7 +118,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
         ]}
       >
         <View style={s.dockPill}>
-          {/* Top gloss specular highlight */}
           <LinearGradient
             colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.02)']}
             start={{ x: 0.5, y: 0 }}
@@ -131,7 +126,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
             pointerEvents="none"
           />
 
-          {/* Gliding spring-active indicator */}
           <Animated.View style={[s.indicatorWrapper, indicatorStyle]}>
             <View style={s.indicator}>
               <LinearGradient
@@ -141,7 +135,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
             </View>
           </Animated.View>
 
-          {/* Tab items row */}
           <View style={s.tabBarRow}>
             {state.routes.map((route, index) => {
               const { options } = descriptors[route.key]!;

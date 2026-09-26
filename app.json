@@ -8,7 +8,8 @@
     "scheme": "thalerseeker",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "finance.thaler.seeker"
     },
     "android": {
       "adaptiveIcon": {

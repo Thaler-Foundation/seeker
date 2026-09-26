@@ -11,7 +11,6 @@ export const shouldDehydrateQuery = (query: { state: { status: string } }) =>
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // In memory for 24h
       gcTime: 24 * 60 * 60_000,
       // Re-validate after 5 min by default; individual queries can override.
       staleTime: 5 * 60_000,

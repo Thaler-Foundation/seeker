@@ -54,7 +54,6 @@ export function SidebarDrawer() {
 
   const address = walletQ.data?.address;
 
-  // Animation values
   const translateX = useSharedValue(-drawerWidth);
   const backdropOpacity = useSharedValue(0);
   const [visible, setVisible] = useState(false);
@@ -164,7 +163,6 @@ export function SidebarDrawer() {
                 </Pressable>
               </View>
 
-              {/* Wallet Address Box */}
               {address ? (
                 <Pressable onPress={onCopyAddress} style={s.addressBox}>
                   <View style={s.addressL}>

@@ -256,7 +256,6 @@ export function InteractiveChart({
       runOnJS(handleScrubEnd)();
     });
 
-  // Current or scrubbed values
   const currentPoint = scrubIndex !== null ? points[scrubIndex] : points[points.length - 1];
   const startPoint = points[0];
   const currentValue = currentPoint?.data.value ?? 0;
