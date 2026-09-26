@@ -14,7 +14,7 @@ import { typography } from '@/theme/typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -154,19 +154,6 @@ function formatCountdown(ms: number): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return d > 0 ? `${d}d ${pad(h)}h ${pad(m)}m ${pad(sec)}s` : `${pad(h)}h ${pad(m)}m ${pad(sec)}s`;
 }
-
-// function toLine(points: [number, number][], w = 100, h = 40): string | null {
-//   if (points.length < 2) return null;
-//   const xs = points.map((p) => p[0]);
-//   const ys = points.map((p) => p[1]);
-//   const x0 = Math.min(...xs);
-//   const spanX = Math.max(...xs) - x0 || 1;
-//   const y0 = Math.min(...ys);
-//   const spanY = Math.max(...ys) - y0 || 1;
-//   return points
-//     .map(([x, y]) => `${(((x - x0) / spanX) * w).toFixed(2)},${(1 + (1 - (y - y0) / spanY) * (h - 2)).toFixed(2)}`)
-//     .join(' ');
-// }
 
 const VAULT_CHART_RANGES = [
   { key: '7D', days: 7 },
@@ -1266,13 +1253,13 @@ function TierTransactions({ vaults, tier }: { vaults: VaultRow[]; tier?: Tier })
         <Text style={[s.tableHeadCell, { flex: 1.3 }]}>Type</Text>
         <Text style={[s.tableHeadCell, { flex: 1.2, textAlign: 'right' }]}>Tokens</Text>
       </View>
-      {/* FlatList virtualizes the rows so only visible items are rendered */}
-      <FlatList
-        data={rows}
-        keyExtractor={(r) => r.id}
-        scrollEnabled={false}
-        renderItem={({ item: r }) => (
-          <View style={s.txRow}>
+      {rows.length === 0 ? (
+        <Text style={[s.muted, { paddingVertical: 14 }]}>
+          {scalpsQ.isLoading || triggersQ.isLoading ? 'Loading activity…' : 'No activity yet.'}
+        </Text>
+      ) : (
+        rows.map((r) => (
+          <View key={r.id} style={s.txRow}>
             <Text style={[s.factValue, { flex: 1.2 }]}>{rel(r.ts)}</Text>
             <View style={{ flex: 1.3 }}>
               <View style={[s.typeBadge, r.badgeBg ? { backgroundColor: r.badgeBg } : null]}>
@@ -1291,13 +1278,8 @@ function TierTransactions({ vaults, tier }: { vaults: VaultRow[]; tier?: Tier })
               ) : null}
             </View>
           </View>
-        )}
-        ListEmptyComponent={
-          <Text style={[s.muted, { paddingVertical: 14 }]}>
-            {scalpsQ.isLoading || triggersQ.isLoading ? 'Loading activity…' : 'No activity yet.'}
-          </Text>
-        }
-      />
+        ))
+      )}
     </View>
   );
 }

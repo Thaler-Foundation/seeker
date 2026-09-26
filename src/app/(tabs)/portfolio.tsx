@@ -14,7 +14,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-  FlatList,
   PixelRatio,
   Pressable,
   ScrollView,
@@ -604,12 +603,9 @@ export default function Portfolio() {
                 </Pressable>
               </View>
             ) : (
-              <FlatList
-                data={visibleHistoryRows}
-                keyExtractor={(r) => r.id}
-                scrollEnabled={false}
-                renderItem={({ item: r, index }) => (
-                  <View style={[styles.txItem, index > 0 && styles.rowBorder]}>
+              <>
+                {visibleHistoryRows.map((r, index) => (
+                  <View key={r.id} style={[styles.txItem, index > 0 && styles.rowBorder]}>
                     <View style={styles.txItemLeft}>
                       <View style={[styles.txIconBox, { backgroundColor: getHistoryBg(r.interaction) }]}>
                         {renderHistoryIcon(r.interaction)}
@@ -635,30 +631,26 @@ export default function Portfolio() {
                       <Text style={styles.txItemDate}>{rel(r.ts)}</Text>
                     </View>
                   </View>
-                )}
-                ListFooterComponent={
-                  <>
-                    {visibleHistoryRows.length < historyRows.length ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => setTxVisible((v) => v + MAX_TX_ROWS)}
-                        style={styles.txLoadMore}
-                      >
-                        <Text style={styles.txRetryLabel}>
-                          Load more ({historyRows.length - visibleHistoryRows.length} remaining)
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                    {historyRows.length > 0 ? (
-                      <View style={styles.txCountRow}>
-                        <Text style={styles.txCountLabel}>
-                          {historyRows.length} transaction{historyRows.length !== 1 ? 's' : ''}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </>
-                }
-              />
+                ))}
+                {visibleHistoryRows.length < historyRows.length ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setTxVisible((v) => v + MAX_TX_ROWS)}
+                    style={styles.txLoadMore}
+                  >
+                    <Text style={styles.txRetryLabel}>
+                      Load more ({historyRows.length - visibleHistoryRows.length} remaining)
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {historyRows.length > 0 ? (
+                  <View style={styles.txCountRow}>
+                    <Text style={styles.txCountLabel}>
+                      {historyRows.length} transaction{historyRows.length !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
             )}
 
             {authenticated && !historyLoading && !history.isError && historyRows.length === 0 ? (

@@ -220,39 +220,49 @@ export function InteractiveChart({
   const isScrubbing = useSharedValue(false);
   const scrubX = useSharedValue(0);
   const scrubY = useSharedValue(0);
+  const lastIndex = useSharedValue(-1);
+  const pointCoords = useSharedValue<{ x: number; y: number }[]>([]);
+
+  useEffect(() => {
+    pointCoords.value = points.map((p) => ({ x: p.x, y: p.y }));
+  }, [points, pointCoords]);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
     if (w > 0) setChartWidth(w);
   }, []);
 
-  const handleScrubUpdate = (xPos: number) => {
-    if (points.length < 2) return;
+  const updateScrub = (xPos: number) => {
+    'worklet';
+    const coords = pointCoords.value;
+    const n = coords.length;
+    if (n < 2) return;
     const clampedX = Math.max(paddingX, Math.min(xPos, paddingX + innerWidth));
     const ratio = (clampedX - paddingX) / innerWidth;
-    const index = Math.round(ratio * (points.length - 1));
-    const clampedIndex = Math.max(0, Math.min(index, points.length - 1));
-    const pt = points[clampedIndex];
-
-    scrubX.value = pt.x;
-    scrubY.value = pt.y;
-    setScrubIndex(clampedIndex);
+    const index = Math.max(0, Math.min(Math.round(ratio * (n - 1)), n - 1));
+    scrubX.value = coords[index].x;
+    scrubY.value = coords[index].y;
+    if (index !== lastIndex.value) {
+      lastIndex.value = index;
+      runOnJS(setScrubIndex)(index);
+    }
   };
 
   const handleScrubEnd = () => {
-    isScrubbing.value = false;
     setScrubIndex(null);
   };
 
   const panGesture = Gesture.Pan()
     .onBegin((e) => {
       isScrubbing.value = true;
-      runOnJS(handleScrubUpdate)(e.x);
+      updateScrub(e.x);
     })
     .onUpdate((e) => {
-      runOnJS(handleScrubUpdate)(e.x);
+      updateScrub(e.x);
     })
     .onFinalize(() => {
+      isScrubbing.value = false;
+      lastIndex.value = -1;
       runOnJS(handleScrubEnd)();
     });
 
