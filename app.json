@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Thaler Seeker",
-    "slug": "thaler-seeker",
+    "name": "Thaler Finance",
+    "slug": "thaler-finance",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "thalerseeker",
+    "scheme": "thalerfinance",
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "finance.thaler.seeker"
+      "bundleIdentifier": "finance.thaler.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "finance.thaler.seeker",
+      "package": "finance.thaler.app",
       "versionCode": 1
     },
     "web": {

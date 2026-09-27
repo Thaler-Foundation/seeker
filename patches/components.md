@@ -1,4 +1,4 @@
-# Component library scope - Thaler Seeker Figma design system
+# Component library scope - Thaler Finance Figma design system
 
 Component set for Figma, derived from `apps/web/src/components/ui` (20
 primitives) plus the composed patterns the screens need. Variants follow

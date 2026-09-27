@@ -237,7 +237,7 @@ export function SidebarDrawer() {
                   </Svg>
                   <Text style={s.signOutText}>Sign Out</Text>
                 </Pressable>
-                <Text style={s.versionText}>Thaler Seeker v1.0.0</Text>
+                <Text style={s.versionText}>Thaler Finance v1.0.0</Text>
               </View>
             </SafeAreaView>
           </Animated.View>

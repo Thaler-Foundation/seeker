@@ -1,4 +1,4 @@
-# Thaler Seeker
+# Thaler Finance
 
 Mobile app for the Solana Seeker device (Android, Solana Mobile dApp store).
 Expo SDK 57 / React Native 0.86 / expo-router. The app calls the deployed

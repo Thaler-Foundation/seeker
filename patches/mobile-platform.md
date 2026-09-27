@@ -8,7 +8,7 @@ screens.
 
 - Seeker is the flagship Solana Mobile device, Android; apps ship through the
   Solana dApp Store (signed APK, dApp Publisher Portal). React Native or
-  Kotlin; Thaler Seeker targets React Native.
+  Kotlin; Thaler Finance targets React Native.
 - Mobile Wallet Adapter (MWA) is the protocol for connecting to wallet apps
   on the device for transaction and message signing.
 - Seed Vault is Seeker's hardware-level secure key custody; signing requests

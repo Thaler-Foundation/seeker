@@ -1,4 +1,4 @@
-# Thaler Seeker documentation
+# Thaler Finance documentation
 
 Full documentation of the Seeker app build (Figma design file:
 zWDlvcaKwmnzMAfd387fF8).

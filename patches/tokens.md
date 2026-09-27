@@ -1,4 +1,4 @@
-# Design tokens - Thaler Seeker
+# Design tokens - Thaler Finance
 
 Every value below is verified against source. File references are the single
 source of truth; if code and this doc ever disagree, code wins.
