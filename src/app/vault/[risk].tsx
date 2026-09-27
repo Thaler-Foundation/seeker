@@ -1,4 +1,6 @@
 import { ChartDataPoint, InteractiveChart } from '@/components/chart/interactive-chart';
+import { ShareYieldSheet } from '@/components/share/share-yield-sheet';
+import type { ShareYieldData } from '@/lib/share-card';
 import {
   endpoints,
   fetchThaler,
@@ -14,7 +16,7 @@ import { typography } from '@/theme/typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -618,6 +620,7 @@ export default function VaultDetail() {
                 vault={selected}
                 pos={positionsQ.data}
                 statRow={statsQ.data?.vaults.find((r) => r.vaultExecutionId === selected.id)}
+                tier={tier}
                 tierMeta={meta}
                 solPrice={solPrice}
                 getToken={getToken}
@@ -850,6 +853,7 @@ function PositionDetail({
   vault,
   pos,
   statRow,
+  tier,
   tierMeta,
   solPrice,
   getToken,
@@ -858,6 +862,7 @@ function PositionDetail({
   vault: VaultRow;
   pos: VaultPositions | undefined;
   statRow: UserVaultStatsView['vaults'][number] | undefined;
+  tier: Tier;
   tierMeta: (typeof TIER_META)[Tier];
   solPrice: number;
   getToken: () => Promise<string | null>;
@@ -909,10 +914,15 @@ function PositionDetail({
     onError: (e) => setClaimNote(e instanceof Error ? e.message : 'Could not start close.'),
   });
 
-  const onShare = () => {
-    const sign = earnedSol >= 0 ? '+' : '';
-    const text = `My Thaler ${tierMeta.label} Vault generated ${sign}${earnedSol.toFixed(4)} SOL in yield. Delta-neutral jitoSOL, hedged on-chain.`;
-    Share.share({ message: `${text} https://thaler.finance` }).catch(() => {});
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareData: ShareYieldData = {
+    scope: 'vault',
+    tier,
+    label: `${tierMeta.label} Vault`,
+    yieldSol: earnedSol,
+    valueSol: depositSol,
+    roiPct: roi,
+    days: daysHeld,
   };
 
   return (
@@ -926,7 +936,7 @@ function PositionDetail({
             <View style={[s.dot, { backgroundColor: tierMeta.color }]} />
             <Text style={s.cardTitle}>{tierMeta.label} · Position Overview</Text>
           </View>
-          <Pressable accessibilityRole="button" onPress={onShare} style={s.btnOutline}>
+          <Pressable accessibilityRole="button" onPress={() => setShareOpen(true)} style={s.btnOutline}>
             <Text style={s.btnOutlineLabel}>Share</Text>
           </Pressable>
         </View>
@@ -1055,6 +1065,7 @@ function PositionDetail({
         ) : null}
         {claimNote ? <Text style={[s.muted12, { marginTop: 8 }]}>{claimNote}</Text> : null}
       </View>
+      <ShareYieldSheet open={shareOpen} onClose={() => setShareOpen(false)} data={shareData} />
     </>
   );
 }

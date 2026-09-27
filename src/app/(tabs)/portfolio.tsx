@@ -1,5 +1,7 @@
 import { InteractiveChart } from '@/components/chart/interactive-chart';
+import { ShareYieldSheet } from '@/components/share/share-yield-sheet';
 import { SidebarTrigger } from '@/components/sidebar/sidebar-trigger';
+import type { ShareYieldData } from '@/lib/share-card';
 import {
   endpoints,
   fetchThaler,
@@ -17,7 +19,6 @@ import {
   PixelRatio,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -179,6 +180,7 @@ export default function Portfolio() {
   const [range, setRange] = useState<RangeKey>('7D');
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
   const [txVisible, setTxVisible] = useState(MAX_TX_ROWS);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const pub = useQuery({
     queryKey: ['public-stats'],
@@ -362,10 +364,15 @@ export default function Portfolio() {
   const money = (v: number) =>
     currency === 'USD' && solPrice > 0 ? `$${(v * solPrice).toFixed(2)}` : `${v.toFixed(4)} SOL`;
 
-  const onShare = () => {
-    const sign = yieldEarnedSol >= 0 ? '+' : '';
-    const text = `My Thaler vaults generated ${sign}${yieldEarnedSol.toFixed(4)} SOL in yield. Delta-neutral jitoSOL, hedged on-chain.`;
-    Share.share({ message: `${text} https://thaler.finance` }).catch(() => {});
+  const maxDaysHeld = rows.reduce((m, r) => Math.max(m, r.daysHeld ?? 0), 0);
+  const shareData: ShareYieldData = {
+    scope: 'total',
+    tier: 'balanced',
+    label: 'All Vaults',
+    yieldSol: yieldEarnedSol,
+    valueSol: depositedSol,
+    roiPct: portfolioRoi,
+    days: maxDaysHeld,
   };
 
   const KPIS = [
@@ -402,7 +409,7 @@ export default function Portfolio() {
             <Pressable
               accessibilityRole="button"
               disabled={rows.length === 0}
-              onPress={onShare}
+              onPress={() => setShareOpen(true)}
               style={[styles.shareBtn, rows.length === 0 && { opacity: 0.5 }]}
             >
               <Svg width={14} height={14} viewBox="0 0 24 24">
@@ -659,6 +666,7 @@ export default function Portfolio() {
           </View>
         )}
       </ScrollView>
+      <ShareYieldSheet open={shareOpen} onClose={() => setShareOpen(false)} data={shareData} />
     </SafeAreaView>
   );
 }
