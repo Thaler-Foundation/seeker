@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "finance.thaler.app"
+      "bundleIdentifier": "finance.thaler.seeker"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "finance.thaler.app",
+      "package": "finance.thaler.seeker",
       "versionCode": 1
     },
     "web": {
@@ -37,7 +37,9 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-font",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

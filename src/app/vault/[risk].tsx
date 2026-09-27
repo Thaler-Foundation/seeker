@@ -295,10 +295,30 @@ function BigStat({ label, value, sub, tone }: { label: string; value: string; su
   );
 }
 
-function SubPill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function SubPill({
+  label,
+  active,
+  onPress,
+  fill,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  fill?: boolean;
+}) {
   return (
-    <Pressable onPress={onPress} style={[s.subPill, active && s.subPillActive]}>
-      <Text style={[s.subPillLabel, active && { color: dark.foreground }]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      style={[s.subPill, fill && s.subPillFill, active && s.subPillActive]}
+    >
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit={fill}
+        minimumFontScale={0.85}
+        style={[s.subPillLabel, fill && s.subPillLabelFill, active && { color: dark.foreground }]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -599,10 +619,10 @@ export default function VaultDetail() {
 
         {tab === 'position' ? (
           <>
-            <View style={s.pillRow}>
-              <SubPill label="Vaults" active={subTab === 'vaults'} onPress={() => { setSubTab('vaults'); }} />
-              <SubPill label="Risk Summary" active={subTab === 'liquidation'} onPress={() => setSubTab('liquidation')} />
-              <SubPill label="Transaction History" active={subTab === 'transactions'} onPress={() => setSubTab('transactions')} />
+            <View style={s.segRow}>
+              <SubPill fill label="Vaults" active={subTab === 'vaults'} onPress={() => { setSubTab('vaults'); }} />
+              <SubPill fill label="Risk Summary" active={subTab === 'liquidation'} onPress={() => setSubTab('liquidation')} />
+              <SubPill fill label="Transactions" active={subTab === 'transactions'} onPress={() => setSubTab('transactions')} />
             </View>
             {!authenticated ? <Text style={s.muted}>Sign in to load your vaults.</Text> : null}
 
@@ -611,7 +631,7 @@ export default function VaultDetail() {
                 {attentionVaults.map((v) => (
                   <PendingVaultCard key={v.id} vault={v} tier={tier} getToken={getToken} onChanged={() => queryClient.invalidateQueries({ queryKey: ['vaults'] })} />
                 ))}
-                <VaultsTable vaults={myVaults} solPrice={solPrice} onSelect={setSelectedId} />
+                <VaultsTable vaults={myVaults} stats={statsQ.data} solPrice={solPrice} onSelect={setSelectedId} />
               </>
             ) : null}
 
@@ -664,8 +684,14 @@ export default function VaultDetail() {
   );
 }
 
-function rowMetrics(v: VaultRow, pos: VaultPositions | undefined, solPriceUsd: number) {
-  const p = pos;
+type MetricSource = {
+  equityNavLamports?: string | null;
+  realizedYieldLamports?: string | null;
+  pendingRecycleUsd?: number | null;
+};
+
+function rowMetrics(v: VaultRow, src: MetricSource | undefined, solPriceUsd: number) {
+  const p = src;
   const baseNetValueSol = p?.equityNavLamports
     ? Number(p.equityNavLamports) / LAMPORTS
     : Number(v.equityLamports) / LAMPORTS;
@@ -682,31 +708,24 @@ function rowMetrics(v: VaultRow, pos: VaultPositions | undefined, solPriceUsd: n
   return { netValue: f(netValue), roi: f(roi), yield: f(yieldSol), ltv: f(ltv) };
 }
 
-type SortKey = 'netValue' | 'roi' | 'yield' | 'ltv';
-const VAULT_COLUMNS: { key: SortKey; label: string }[] = [
-  { key: 'netValue', label: 'NET VALUE' },
-  { key: 'roi', label: 'RETURN RATE' },
-  { key: 'yield', label: 'YIELD' },
-  { key: 'ltv', label: 'LTV' },
-];
 
-function VaultsTable({ vaults, solPrice, onSelect }: { vaults: VaultRow[]; solPrice: number; onSelect: (id: string) => void }) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({
-    key: 'netValue',
-    dir: 'desc',
-  });
+function VaultsTable({
+  vaults,
+  stats,
+  solPrice,
+  onSelect,
+}: {
+  vaults: VaultRow[];
+  stats: UserVaultStatsView | undefined;
+  solPrice: number;
+  onSelect: (id: string) => void;
+}) {
   const rows = useMemo(() => {
-    const mapped = vaults.map((v) => ({ v, m: rowMetrics(v, undefined, solPrice) }));
-    mapped.sort((a, b) => {
-      const diff = a.m[sort.key] - b.m[sort.key];
-      return sort.dir === 'asc' ? diff : -diff;
-    });
+    const statByVault = new Map((stats?.vaults ?? []).map((r) => [r.vaultExecutionId, r]));
+    const mapped = vaults.map((v) => ({ v, m: rowMetrics(v, statByVault.get(v.id), solPrice) }));
+    mapped.sort((a, b) => b.m.netValue - a.m.netValue);
     return mapped;
-  }, [vaults, solPrice, sort]);
-  const toggleSort = (key: SortKey) =>
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }
-    );
+  }, [vaults, stats, solPrice]);
   if (vaults.length === 0) {
     return (
       <View style={s.card}>
@@ -715,61 +734,54 @@ function VaultsTable({ vaults, solPrice, onSelect }: { vaults: VaultRow[]; solPr
       </View>
     );
   }
-  const colW = 92;
   return (
-    <View style={s.list}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ minWidth: 680 }}>
-          <View style={[s.tableHead, s.rowPad]}>
-            <Text style={[s.tableHeadCell, { width: 150 }]}>STRATEGY</Text>
-            {VAULT_COLUMNS.map((c) => {
-              const active = sort.key === c.key;
-              return (
-                <Pressable key={c.key} onPress={() => toggleSort(c.key)} style={[s.headBtn, { width: colW }]}>
-                  <Text style={[s.tableHeadCell, active && { color: dark.foreground }]}>
-                    {c.label}
-                  </Text>
-                  <Text style={[s.sortMark, active && { color: dark.foreground }]}>
-                    {active ? (sort.dir === 'asc' ? '▴' : '▾') : '▴▾'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            <Text style={[s.tableHeadCell, { width: 90 }]} />
-          </View>
-          {rows.map(({ v, m }, i) => {
-            const meta = TIER_META[(v.tier ?? 'safe') as Tier] ?? TIER_META.safe;
-            return (
-              <Pressable key={v.id} onPress={() => onSelect(v.id)} style={[s.tableRow, s.rowPad, i > 0 && s.rowBorder]}>
-                <View style={[s.rowL, { width: 150 }]}>
-                  <View style={[s.dot, { backgroundColor: meta.color }]} />
-                  <View style={{ flexShrink: 1 }}>
-                    <Text style={s.factValue}>{meta.label} Vault</Text>
-                    <Text style={s.muted12}>{meta.lst}/SOL</Text>
-                  </View>
+    <View style={{ gap: spacing.md }}>
+      {rows.map(({ v, m }) => {
+        const meta = TIER_META[(v.tier ?? 'safe') as Tier] ?? TIER_META.safe;
+        return (
+          <Pressable key={v.id} onPress={() => onSelect(v.id)} style={s.card}>
+            <View style={s.vaultCardHead}>
+              <View style={s.rowL}>
+                <View style={[s.dot, { backgroundColor: meta.color }]} />
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={s.factValue}>{meta.label} Vault</Text>
+                  <Text style={s.muted12}>{meta.lst}/SOL</Text>
                 </View>
-                <Text style={[s.cellFixed, { width: colW }]}>{m.netValue.toFixed(4)} SOL</Text>
+              </View>
+              <View style={s.btnOutline}>
+                <Text style={s.btnOutlineLabel}>Manage</Text>
+              </View>
+            </View>
+            <View style={s.vaultMetricGrid}>
+              <View style={s.vaultMetric}>
+                <Text style={s.vaultMetricLabel}>NET VALUE</Text>
+                <Text style={s.factValue}>{m.netValue.toFixed(4)} SOL</Text>
+              </View>
+              <View style={s.vaultMetric}>
+                <Text style={s.vaultMetricLabel}>RETURN RATE</Text>
                 <Text
                   style={[
-                    s.cellFixed,
-                    { width: colW },
+                    s.factValue,
                     { color: m.roi > 0 ? brand.success : m.roi < 0 ? brand.warning : dark.foreground },
                   ]}
                 >
                   {m.roi.toFixed(2)}%
                 </Text>
-                <Text style={[s.cellFixed, { width: colW }, m.yield > 0 && { color: brand.success }]}>
+              </View>
+              <View style={s.vaultMetric}>
+                <Text style={s.vaultMetricLabel}>YIELD</Text>
+                <Text style={[s.factValue, m.yield > 0 && { color: brand.success }]}>
                   {m.yield.toFixed(4)} SOL
                 </Text>
-                <Text style={[s.cellFixed, { width: colW }]}>{m.ltv.toFixed(2)}%</Text>
-                <View style={[s.btnOutline, { width: 90, alignItems: 'center' }]}>
-                  <Text style={s.btnOutlineLabel}>Manage</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
+              </View>
+              <View style={s.vaultMetric}>
+                <Text style={s.vaultMetricLabel}>LTV</Text>
+                <Text style={s.factValue}>{m.ltv.toFixed(2)}%</Text>
+              </View>
+            </View>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -884,6 +896,15 @@ function PositionDetail({
   const daysHeld = Number.isFinite(p?.daysHeld ?? NaN) ? (p?.daysHeld as number) : 0;
   const claimableNet = statRow?.claimableNetSol ?? 0;
   const cp = p?.claimPreview ?? null;
+  console.log('[DEBUG claim]', JSON.stringify({
+    earnedSol,
+    statClaimableNetSol: statRow?.claimableNetSol,
+    statClaimableSol: statRow?.claimableSol,
+    cpReleasableNowNet: cp?.releasableNowNetLamports,
+    cpNetUserYield: cp?.netUserYieldLamports,
+    cpGrossClaimable: cp?.grossClaimableLamports,
+    hasClaimPreview: cp != null,
+  }));
   const [claimNote, setClaimNote] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const claimNextAllowedAtMs = p?.claimNextAllowedAtMs ?? null;
@@ -1217,7 +1238,7 @@ function TierTransactions({ vaults, tier }: { vaults: VaultRow[]; tier?: Tier })
       const ts = typeof rawTs === 'string' ? Date.parse(rawTs) : Number(rawTs ?? 0);
       const isScalp = s.eventType === 'SCALP' || !s.eventType;
       const eventName = isScalp ? 'Scalp' : 'Pre-Scalp';
-      const profitStr = s.profitUsd != null ? `+${s.profitUsd.toFixed(4)} SOL` : '-';
+      const profitStr = s.profitUsd != null ? `+$${s.profitUsd.toFixed(2)}` : '-';
 
       out.push({
         id: `scalp-${s.id}`,
@@ -1331,6 +1352,9 @@ const s = StyleSheet.create({
   },
   subPillActive: { backgroundColor: dark.muted, borderColor: 'rgba(250,250,250,0.4)' },
   subPillLabel: { color: dark.mutedForeground, fontSize: 14, fontWeight: '500' },
+  segRow: { flexDirection: 'row', gap: spacing.sm },
+  subPillFill: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
+  subPillLabelFill: { fontSize: 13, textAlign: 'center' },
   card: {
     backgroundColor: glass.bg,
     borderColor: glass.border,
@@ -1379,6 +1403,10 @@ const s = StyleSheet.create({
   cellFixed: { color: dark.foreground, fontSize: 12, fontVariant: ['tabular-nums'] },
   headBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   sortMark: { color: dark.mutedForeground, fontSize: 8 },
+  vaultCardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  vaultMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md, columnGap: spacing.md },
+  vaultMetric: { flexBasis: '46%', flexGrow: 1, gap: 3 },
+  vaultMetricLabel: { color: dark.mutedForeground, fontSize: 10, letterSpacing: 1, fontWeight: '600' },
   h3: { color: dark.foreground, fontSize: 15, fontWeight: '600' },
   showMore: { color: dark.foreground, fontSize: 14, fontWeight: '500' },
   eyebrow: { color: dark.mutedForeground, fontSize: 10, letterSpacing: 1.4, fontWeight: '600', marginTop: 4 },
