@@ -2,6 +2,7 @@ node_modules/
 .expo/
 .turbo/
 dist/
+.husky-export-check/
 *.log
 
 # local secrets, never commit

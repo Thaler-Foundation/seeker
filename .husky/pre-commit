@@ -1,0 +1,15 @@
+echo "🔎 pre-commit: typecheck + lint"
+
+echo "→ typecheck (tsc --noEmit)"
+bun run typecheck || {
+  echo "❌ Typecheck failed. Fix type errors before committing."
+  exit 1
+}
+
+echo "→ lint (expo lint)"
+bun run lint || {
+  echo "❌ Lint failed. Fix lint errors before committing."
+  exit 1
+}
+
+echo "✅ pre-commit checks passed"
