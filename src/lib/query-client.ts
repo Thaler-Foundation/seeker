@@ -1,5 +1,3 @@
-// Singleton QueryClient + AsyncStorage persister for cross-restart cache.
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { dehydrate, focusManager, QueryClient } from '@tanstack/react-query';
@@ -12,7 +10,6 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       gcTime: 24 * 60 * 60_000,
-      // Re-validate after 5 min by default; individual queries can override.
       staleTime: 5 * 60_000,
       retry: 2,
     },

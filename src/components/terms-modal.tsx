@@ -1,5 +1,3 @@
-// Vault creation agreement gate, ported verbatim from apps/web terms-modal.tsx.
-
 import { useEffect, useRef, useState } from 'react';
 import {
   Modal,

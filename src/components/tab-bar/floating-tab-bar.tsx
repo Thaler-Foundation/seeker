@@ -1,3 +1,4 @@
+import { GlassSurface } from '@/components/ui/glass-surface';
 import { dock } from '@/theme/tokens';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect } from 'react';
@@ -117,15 +118,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
           },
         ]}
       >
-        <View style={s.dockPill}>
-          <LinearGradient
-            colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.02)']}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 0.8 }}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-
+        <GlassSurface style={s.dockPill} borderRadius={dock.radius} intensity={40}>
           <Animated.View style={[s.indicatorWrapper, indicatorStyle]}>
             <View style={s.indicator}>
               <LinearGradient
@@ -171,7 +164,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
               );
             })}
           </View>
-        </View>
+        </GlassSurface>
       </View>
     </>
   );
@@ -196,11 +189,6 @@ const s = StyleSheet.create({
   },
   dockPill: {
     flex: 1,
-    borderRadius: dock.radius,
-    backgroundColor: 'rgba(22, 23, 26, 0.88)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    overflow: 'hidden',
     justifyContent: 'center',
   },
   indicatorWrapper: {

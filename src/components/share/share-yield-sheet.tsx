@@ -1,5 +1,3 @@
-// Bottom sheet that previews the branded yield card and shares or copies it.
-
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,

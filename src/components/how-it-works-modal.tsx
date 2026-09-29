@@ -1,5 +1,3 @@
-// Modal listing the four steps of how earning works, plus a docs link.
-
 import { Modal, View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-native';
 import { dark, radius, spacing } from '@/theme/tokens';
 

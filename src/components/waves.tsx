@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -8,6 +8,9 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Defs, Image as SvgImage, Mask, Rect } from 'react-native-svg';
+
+const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 
 export interface WavesProps {
   step?: 'start' | 'email' | 'code';
@@ -24,6 +27,7 @@ export function Waves({
   opacity,
   tintColor,
 }: WavesProps) {
+  const maskId = useId();
   const translateY = useSharedValue(0);
   const translateX = useSharedValue(0);
   const scale = useSharedValue(1.08);
@@ -124,15 +128,37 @@ export function Waves({
         style,
       ]}
     >
-      <Animated.Image
-        source={require('../../assets/images/hero-waves.png')}
-        resizeMode="cover"
-        style={[
-          variant === 'fullscreen' ? styles.fullImage : styles.cardImage,
-          tintColor ? { tintColor } : null,
-          animatedStyle,
-        ]}
-      />
+      {tintColor ? (
+        <AnimatedSvg
+          style={[
+            variant === 'fullscreen' ? styles.fullImage : styles.cardImage,
+            animatedStyle,
+          ]}
+        >
+          <Defs>
+            <Mask id={maskId}>
+              <SvgImage
+                href={require('../../assets/images/hero-waves.png')}
+                x="0"
+                y="0"
+                width="100%"
+                height="100%"
+                preserveAspectRatio="xMidYMid slice"
+              />
+            </Mask>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill={tintColor} mask={`url(#${maskId})`} />
+        </AnimatedSvg>
+      ) : (
+        <Animated.Image
+          source={require('../../assets/images/hero-waves.png')}
+          resizeMode="cover"
+          style={[
+            variant === 'fullscreen' ? styles.fullImage : styles.cardImage,
+            animatedStyle,
+          ]}
+        />
+      )}
     </View>
   );
 }
@@ -164,4 +190,3 @@ const styles = StyleSheet.create({
     right: '-15%',
   },
 });
-

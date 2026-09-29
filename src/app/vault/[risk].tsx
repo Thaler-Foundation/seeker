@@ -1,6 +1,5 @@
 import { ChartDataPoint, InteractiveChart } from '@/components/chart/interactive-chart';
 import { ShareYieldSheet } from '@/components/share/share-yield-sheet';
-import type { ShareYieldData } from '@/lib/share-card';
 import {
   endpoints,
   fetchThaler,
@@ -11,6 +10,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { OPEN_FEE_BUFFER_SOL } from '@/lib/contracts';
+import type { ShareYieldData } from '@/lib/share-card';
 import { brand, dark, glass, radius, spacing } from '@/theme/tokens';
 import { typography } from '@/theme/typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

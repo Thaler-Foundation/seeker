@@ -1,5 +1,3 @@
-// Response types for the BFF endpoints this app consumes.
-
 export type AnalyticsMode = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 export type AnalyticsKpis = {

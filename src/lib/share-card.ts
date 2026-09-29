@@ -1,6 +1,3 @@
-// Branded yield card. The image is rendered server-side by the BFF OG endpoint
-// (/api/og/vault-share); the app builds the URL, downloads the PNG, and shares it.
-
 import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -14,19 +11,13 @@ const SHARE_BASE_URL = 'https://thaler.finance';
 export type ShareYieldData = {
   scope: 'total' | 'vault';
   tier: Tier;
-  /** Descriptor line, e.g. "All Vaults" or "Safe Vault". */
   label: string;
-  /** Lifetime yield generated, in SOL (signed). */
   yieldSol: number;
-  /** Total value / deposited principal, in SOL. */
   valueSol: number;
-  /** Return on deposit, in percent. */
   roiPct: number;
-  /** Days the position(s) have been open. */
   days: number;
 };
 
-// Formatting matches the web modal so the server renders an identical card.
 export function buildShareCardUrl(data: ShareYieldData): string {
   const params = new URLSearchParams({
     scope: data.scope,
@@ -59,8 +50,6 @@ export async function copyCard(data: ShareYieldData): Promise<void> {
 
 export type ShareResult = 'shared-image' | 'shared-text';
 
-// Shares the card image via the native sheet, falling back to text when image
-// sharing is unavailable (web, some simulators, offline).
 export async function shareCard(data: ShareYieldData): Promise<ShareResult> {
   if (await Sharing.isAvailableAsync()) {
     try {
