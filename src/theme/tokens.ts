@@ -86,7 +86,7 @@ export const glass = {
 
 export const dock = {
   height: 64,
-  radius: 32,
+  radius: 30,
   bottomOffset: 12,
 } as const;
 

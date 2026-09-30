@@ -72,13 +72,6 @@ export default function RootLayout() {
                   gestureEnabled: true,
                 }}
               />
-              <Stack.Screen
-                name="wallet"
-                options={{
-                  presentation: 'modal',
-                  animation: 'slide_from_bottom',
-                }}
-              />
             </Stack>
             <SidebarDrawer />
           </SidebarProvider>

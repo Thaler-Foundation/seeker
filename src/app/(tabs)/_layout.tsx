@@ -8,6 +8,8 @@ export default function TabsLayout() {
       tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        animation: 'fade',
+        transitionSpec: { animation: 'timing', config: { duration: 120 } },
         sceneStyle: { backgroundColor: dark.background },
       }}
     >

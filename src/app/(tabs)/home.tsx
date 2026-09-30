@@ -155,7 +155,7 @@ export default function Home() {
 
           <Animated.View entering={FadeInDown.duration(420).delay(80)}>
             <View style={styles.featured}>
-              <Waves variant="card" opacity={0.4} tintColor={currentTier.color} />
+              <Waves variant="card" opacity={0.5} tintColor={currentTier.color} />
 
               <LinearGradient
                 colors={[dark.card, dark.card, 'rgba(20, 20, 22, 0.65)', 'transparent']}
