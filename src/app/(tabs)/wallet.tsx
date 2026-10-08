@@ -201,7 +201,14 @@ export default function WalletScreen() {
           id: `scalp-${x.id}`,
           title: x.eventType === 'SCALP' ? 'Scalp' : 'Pre-Scalp',
           sub: x.positionCoin ?? 'SOL',
-          value: x.profitUsd !== null ? `${x.profitUsd.toFixed(4)} SOL` : '-',
+          // Scalp profit is reported in USD; convert to SOL at the current price
+          // (same as the web activity feed), falling back to USD when price is unknown.
+          value:
+            x.profitUsd === null
+              ? '-'
+              : solPrice > 0
+                ? `${(x.profitUsd / solPrice).toFixed(4)} SOL`
+                : `$${x.profitUsd.toFixed(2)}`,
           ts: x.executedAt ?? x.createdAt,
         }))
     )
