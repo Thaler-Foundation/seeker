@@ -1,0 +1,22 @@
+echo "📦 pre-push: bundling iOS + Android (expo export)"
+
+# Throwaway output dir so we never touch the real ./dist build.
+OUT=".husky-export-check"
+rm -rf "$OUT"
+
+echo "→ bundling iOS"
+bunx expo export --platform ios --output-dir "$OUT/ios" --no-minify || {
+  echo "❌ iOS bundle failed. Fix build errors before pushing."
+  rm -rf "$OUT"
+  exit 1
+}
+
+echo "→ bundling Android"
+bunx expo export --platform android --output-dir "$OUT/android" --no-minify || {
+  echo "❌ Android bundle failed. Fix build errors before pushing."
+  rm -rf "$OUT"
+  exit 1
+}
+
+rm -rf "$OUT"
+echo "✅ pre-push bundles succeeded (iOS + Android)"

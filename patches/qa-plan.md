@@ -1,4 +1,4 @@
-# Final QA + polish plan - Thaler Seeker Mobile Figma
+# Final QA + polish plan - Thaler Finance Mobile Figma
 
 File zWDlvcaKwmnzMAfd387fF8. Every check below is deterministic: it either
 runs as a script against the file (results recorded in qa-results.md) or is

@@ -1,4 +1,4 @@
-# Full UI map - Thaler Seeker
+# Full UI map - Thaler Finance
 
 Read this first. This map was verified at main 4e841e0b on 2026-07-16.
 Production main is now 8d96a358, 35 web commits later. The /dashboard and

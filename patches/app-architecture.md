@@ -1,4 +1,4 @@
-# Thaler Seeker - app architecture
+# Thaler Finance - app architecture
 
 The Seeker app is a standalone Expo (React Native) repo mirroring the
 production web UI (Thaler-Finance apps/web protected routes at main 4e841e0b
@@ -15,7 +15,7 @@ plus the Thaler-Foundation/frontend /portfolio upgrades).
 
 ```
 ./
-  app.json               Expo config: name "Thaler Seeker", finance.thaler.seeker,
+  app.json               Expo config: name "Thaler Finance", finance.thaler.app,
                          icon/adaptive icon from the real apps/web logo.png
   metro.config.js        browser-first unstable_conditionNames so jose (inside
                          @privy-io/js-sdk-core) resolves its browser build

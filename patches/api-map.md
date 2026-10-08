@@ -1,4 +1,4 @@
-# Screen to endpoint map - Thaler Seeker
+# Screen to endpoint map - Thaler Finance
 
 Source: `backend-openapi.yaml` v0.0.2, which lives only in the Thaler-Finance
 working tree at `docs/` and is never committed, so it cannot be resolved from a

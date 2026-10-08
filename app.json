@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "Thaler Seeker",
-    "slug": "thaler-seeker",
+    "name": "Thaler Finance",
+    "slug": "thaler-finance",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "thalerseeker",
+    "scheme": "thalerfinance",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "finance.thaler.seeker"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,12 +31,16 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0a0a0b",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-font",
+      "expo-web-browser",
+      "react-native-bottom-tabs"
     ],
     "extra": {
       "eas": {

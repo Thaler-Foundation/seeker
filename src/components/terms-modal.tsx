@@ -1,5 +1,3 @@
-// Vault creation agreement gate, ported verbatim from apps/web terms-modal.tsx.
-
 import { useEffect, useRef, useState } from 'react';
 import {
   Modal,
@@ -79,6 +77,7 @@ export function TermsModal({
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <View style={s.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={s.sheet}>
           <View style={s.header}>
             <Text style={s.eyebrow}>TERMS & POLICY AGREEMENT</Text>

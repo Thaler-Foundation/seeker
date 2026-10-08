@@ -1,4 +1,4 @@
-# Thaler Seeker - screen map (as built)
+# Thaler Finance - screen map (as built)
 
 Every screen in src/app, its production counterpart, and its data sources.
 

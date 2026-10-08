@@ -103,7 +103,7 @@ button unlocks.
 3. eas build:configure once, to create eas.json.
 4. eas build -p android --profile production, this builds the android aab.
 5. download the aab, then submit it to the solana dapp store with the dapp store
-   cli or the publisher portal. the android package is finance.thaler.seeker and
+   cli or the publisher portal. the android package is finance.thaler.app and
    the version is in app.json.
 6. bump the version in app.json for each new store release.
 

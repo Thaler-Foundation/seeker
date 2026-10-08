@@ -1,4 +1,4 @@
-# QA results - Thaler Seeker Mobile Figma (2026-07-16)
+# QA results - Thaler Finance Mobile Figma (2026-07-16)
 
 File zWDlvcaKwmnzMAfd387fF8. Every number below is script output from the
 audits defined in qa-plan.md, run against pages 0:1 / 5:20 / 5:21.
